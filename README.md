@@ -83,12 +83,16 @@ API); the iOS build is App Store-bound and sandboxed, as iOS requires.
 - [x] Notifications via `UNUserNotificationCenter`
 - [x] WidgetKit extension written and embedded for macOS and iOS
 - [x] iOS app target written
-- [ ] Widget *visible* — needs release signing, see RELEASE.md
-- [ ] iOS build + TestFlight — needs the Apple account, see RELEASE.md
+- [x] iOS app builds, launches and measures (verified in the simulator against
+      the live API: `remaining=$9.47 spend=$1.74 today=$1.54 account=f12057`)
+- [x] Release signing: team `4QJ25Y85MX`, App Group granted, `Fireworks.ipa`
+      exported with an Apple Distribution certificate
+- [ ] TestFlight upload — needs the App Store Connect record and an upload key
+- [ ] Widget *visible on the Mac* — needs this Mac registered as a device
 - [ ] Notarized DMG + Homebrew cask — needs a Developer ID certificate
 
-Signing, the App Group registration and TestFlight are documented step by step in
-[RELEASE.md](RELEASE.md); each needs the Apple ID, so none of it is automatic.
+[RELEASE.md](RELEASE.md) has the commands, the verified output, and exactly what
+still needs the Apple account.
 
 The SwiftBar plugin lives at
 [steveafrost/fireworks-menubar](https://github.com/steveafrost/fireworks-menubar)

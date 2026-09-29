@@ -82,6 +82,21 @@ public enum SharedContainer {
         _ = directory
     }
 
+    /// Environment overrides for bringing up a device with no UI interaction:
+    /// `FIREWORKS_ANCHOR_BALANCE` and `FIREWORKS_ANCHOR_TIME` (ISO-8601, optional
+    /// — now is assumed). Both only ever fill a blank, so a config file on disk
+    /// always beats them. The API key has its own fallback in `KeyStore`
+    /// (`FIREWORKS_API_KEY`).
+    public static func applyEnvironmentSeed(to config: inout FireworksConfig) {
+        let environment = ProcessInfo.processInfo.environment
+        if config.anchorBalance <= 0,
+           let raw = environment["FIREWORKS_ANCHOR_BALANCE"],
+           let amount = Double(raw.trimmingCharacters(in: .whitespaces)), amount > 0 {
+            config.anchorBalance = amount
+            config.anchorTime = environment["FIREWORKS_ANCHOR_TIME"].flatMap { Time.parse($0) } ?? Date()
+        }
+    }
+
     /// The Mac path the SwiftBar plugin used, if this Mac ever ran it.
     ///
     /// A user migrating from the plugin should not have to re-enter the balance

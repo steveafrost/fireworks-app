@@ -39,6 +39,10 @@ public final class AppModel {
         let carried = SharedContainer.migrateFromPlugin()
         config = ConfigStore.load(from: SharedContainer.directory)
         reading = ReadingStore.load(from: SharedContainer.directory)
+        // Headless seeding, so a fresh device can be brought up (and verified)
+        // without typing into the UI — a simulator, a CI run, or a second Mac.
+        // Only ever fills a gap: a real setting on disk always wins.
+        SharedContainer.applyEnvironmentSeed(to: &config)
         status = config.isAnchored ? .idle : .needsAnchor
         let dataPath = SharedContainer.directory.path
         let pluginPath = SharedContainer.pluginDirectory?.path ?? "—"
@@ -58,7 +62,6 @@ public final class AppModel {
 
     /// Refresh now, then keep refreshing on the configured cadence.
     public func start() async {
-        await notifier.prepare(config: config)
         await refresh()
         loop?.cancel()
         loop = Task { [weak self] in
@@ -209,13 +212,18 @@ public final class AppModel {
         mutate(&config)
         config.normalise()
         _ = try? ConfigStore.save(config, to: SharedContainer.directory)
-        Task { await notifier.prepare(config: config) }
+        // Turning alerts on is the one moment the user has asked for them, so
+        // that — not launch — is when the permission prompt makes sense.
+        if config.notify {
+            Task { await notifier.ensureAuthorised() }
+        }
     }
 
     public func testNotification() async -> Bool {
-        await notifier.send(AlertEvent(kind: .spend,
-                                       message: "Fireworks \(Money.formatted(reading?.remaining ?? 0)) left",
-                                       subtitle: "This is what a credit alert looks like"))
+        _ = await notifier.ensureAuthorised()
+        return await notifier.send(AlertEvent(kind: .spend,
+                                              message: "Fireworks \(Money.formatted(reading?.remaining ?? 0)) left",
+                                              subtitle: "This is what a credit alert looks like"))
     }
 
     #if DEBUG

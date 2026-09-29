@@ -11,7 +11,6 @@
 		0C7DE99F587A800859A3D0F4 /* FireworksApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD8626E5708C7E43E2BC8C4D /* FireworksApp.swift */; };
 		0E93634809A0811CE85716FD /* FireworksCore in Frameworks */ = {isa = PBXBuildFile; productRef = 261586DABDCF86019EF9E28F /* FireworksCore */; };
 		14D9F6A70FEE077D15265C19 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D58113215EE7004A68FDA2B /* Diagnostics.swift */; };
-		167988C5AF1066F388B7D031 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D8A7FC6E87FABC198DBC7DE2 /* Info.plist */; };
 		184A1A90316A15DCAE353B49 /* WidgetModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DE71B3D22A1D73954DB55 /* WidgetModel.swift */; };
 		197DEA9B8137E5A16279BDF3 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D58113215EE7004A68FDA2B /* Diagnostics.swift */; };
 		1A3504B505F2B11B2E173FC2 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCCAF7BB6EBF4EEC7FC0B7F0 /* AppModel.swift */; };
@@ -55,7 +54,6 @@
 		E36767E3B60DC606EFA11E68 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72AF5FEE0223329B28C2956E /* Components.swift */; };
 		E4D1EDF8254C854CED77F00E /* FireworksWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5EBF73694F0BD0A94AD9818 /* FireworksWidget.swift */; };
 		EBF8E0FFE9D9A819A8C9865C /* FireworksWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8004FB46692D106DD2238A76 /* FireworksWidgets.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		EDB28179770E3F539A8218EE /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B6681C2959B45DF3E6E938BB /* Info.plist */; };
 		F4F747261C15EFFF1AD7534F /* FireworksCore in Frameworks */ = {isa = PBXBuildFile; productRef = BA928370D51B636C189C989F /* FireworksCore */; };
 /* End PBXBuildFile section */
 
@@ -117,11 +115,9 @@
 		A2009EC794E5977CD003CF18 /* Notifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifier.swift; sourceTree = "<group>"; };
 		AAA2FEE8A0377C30D2A2BB61 /* FireworksWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireworksWidgetView.swift; sourceTree = "<group>"; };
 		B3188F03C4DC0558A9639799 /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = Core; sourceTree = SOURCE_ROOT; };
-		B6681C2959B45DF3E6E938BB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B9B75A290B19848F395F412F /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
 		BA0BA2EC62A607D06344A9C6 /* Fireworks.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fireworks.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BD8626E5708C7E43E2BC8C4D /* FireworksApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireworksApp.swift; sourceTree = "<group>"; };
-		D8A7FC6E87FABC198DBC7DE2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DCCAF7BB6EBF4EEC7FC0B7F0 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		E00DE71B3D22A1D73954DB55 /* WidgetModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetModel.swift; sourceTree = "<group>"; };
 		F0BBAD9DDF20A1CE1BF75CBC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -166,22 +162,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		12E61620DFDC65B437D58423 /* iOS */ = {
-			isa = PBXGroup;
-			children = (
-				B6681C2959B45DF3E6E938BB /* Info.plist */,
-			);
-			path = iOS;
-			sourceTree = "<group>";
-		};
-		28394914CED36485199D9170 /* Mac */ = {
-			isa = PBXGroup;
-			children = (
-				D8A7FC6E87FABC198DBC7DE2 /* Info.plist */,
-			);
-			path = Mac;
-			sourceTree = "<group>";
-		};
 		5D2674A1487CE62D4EBF77B8 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -203,8 +183,6 @@
 		7DEC8094E2DD263C875EE18E /* Widgets */ = {
 			isa = PBXGroup;
 			children = (
-				12E61620DFDC65B437D58423 /* iOS */,
-				28394914CED36485199D9170 /* Mac */,
 				F5EBF73694F0BD0A94AD9818 /* FireworksWidget.swift */,
 				78E03B3A3AAE0C25B9276733 /* FireworksWidgets.entitlements */,
 				AAA2FEE8A0377C30D2A2BB61 /* FireworksWidgetView.swift */,
@@ -286,7 +264,6 @@
 			buildConfigurationList = A592DB8B7361C83550369A81 /* Build configuration list for PBXNativeTarget "FireworksiOSWidgets" */;
 			buildPhases = (
 				E18BCD59B2ED1B8D683166C3 /* Sources */,
-				302B31B520158FEE2C0385A9 /* Resources */,
 				BBB10D771B75F7C8353DE5BC /* Frameworks */,
 			);
 			buildRules = (
@@ -328,7 +305,6 @@
 			buildConfigurationList = BBDA2B7A2B0D38D4139EF96F /* Build configuration list for PBXNativeTarget "FireworksWidgets" */;
 			buildPhases = (
 				59A1AFA282AE23E5EC19EA4D /* Sources */,
-				1CA3CF90C6982C02D1780CEB /* Resources */,
 				CBB55D280F55AC60331CE77D /* Frameworks */,
 			);
 			buildRules = (
@@ -414,27 +390,11 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		1CA3CF90C6982C02D1780CEB /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				EDB28179770E3F539A8218EE /* Info.plist in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		2E3AED8FF268244B605D8D53 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				D40657A4EE9FEE6836ED4791 /* .gitkeep in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		302B31B520158FEE2C0385A9 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				167988C5AF1066F388B7D031 /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -693,7 +653,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ENABLE_APP_SANDBOX = YES;
-				INFOPLIST_FILE = Widgets/iOS/Info.plist;
+				INFOPLIST_FILE = "Config/Widget-iOS-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -730,7 +690,7 @@
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = YES;
-				INFOPLIST_FILE = Widgets/Mac/Info.plist;
+				INFOPLIST_FILE = "Config/Widget-macOS-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -783,7 +743,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Widgets/FireworksWidgets.entitlements;
 				ENABLE_APP_SANDBOX = YES;
-				INFOPLIST_FILE = Widgets/iOS/Info.plist;
+				INFOPLIST_FILE = "Config/Widget-iOS-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -803,7 +763,7 @@
 				CODE_SIGN_ENTITLEMENTS = Widgets/FireworksWidgets.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = YES;
-				INFOPLIST_FILE = Widgets/Mac/Info.plist;
+				INFOPLIST_FILE = "Config/Widget-macOS-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

@@ -10,18 +10,18 @@ import FireworksCore
 /// refused, so every path here is best-effort and never blocks a refresh.
 public actor Notifier {
     private var authorised = false
-    private var asked = false
 
     public init() {}
 
-    /// Ask for permission if the setting is on and we have not asked yet.
+    /// Ask for permission only when there is something to ask *about*.
     ///
-    /// Asked lazily (on the first refresh) rather than at launch: a permission
-    /// prompt in the first second of a first run is exactly the prompt people
-    /// decline.
-    public func prepare(config: FireworksConfig) async {
-        guard config.notify, !asked else { return }
-        asked = true
+    /// A prompt in the first second of a first run is the prompt people decline —
+    /// and on iOS it lands on top of onboarding, before the user has entered
+    /// anything, which is worse. So this is called when an alert actually needs
+    /// posting, or when the user explicitly asks for one.
+    @discardableResult
+    public func ensureAuthorised() async -> Bool {
+        if authorised { return true }
         let centre = UNUserNotificationCenter.current()
         let settings = await centre.notificationSettings()
         switch settings.authorizationStatus {
@@ -32,13 +32,14 @@ public actor Notifier {
         default:
             authorised = false
         }
+        return authorised
     }
 
     /// Post every planned event. Returns the kinds that were actually posted.
     @discardableResult
     public func deliver(_ events: [AlertEvent], enabled: Bool) async -> [AlertEvent.Kind] {
-        guard enabled else { return [] }
-        guard authorised else { return [] }
+        guard enabled, !events.isEmpty else { return [] }
+        guard await ensureAuthorised() else { return [] }
         var posted: [AlertEvent.Kind] = []
         for event in events where await send(event) {
             posted.append(event.kind)

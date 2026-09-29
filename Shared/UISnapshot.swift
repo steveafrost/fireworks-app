@@ -1,9 +1,10 @@
 import Foundation
 import SwiftUI
-import AppKit
 import FireworksCore
 
 #if os(macOS)
+import AppKit
+
 /// Render the UI offscreen and write PNGs.
 ///
 /// This exists because the honest answer to "does the popover look right?" cannot

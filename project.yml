@@ -3,6 +3,11 @@
 # a reviewable line in git instead of an opaque pbxproj diff.
 #
 #   xcodegen generate && open Fireworks.xcodeproj
+#
+# Info.plists live in Config/, deliberately outside the source trees: a plist
+# inside a folder that is a target's `sources` is also copied as a resource, and
+# two targets sharing that folder then produce the same file twice — which
+# fails the build with "Multiple commands produce ... Info.plist".
 name: Fireworks
 options:
   bundleIdPrefix: com.whitebox
@@ -85,7 +90,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.whitebox.fireworks.widgets
         PRODUCT_NAME: FireworksWidgets
-        INFOPLIST_FILE: Widgets/Mac/Info.plist
+        INFOPLIST_FILE: Config/Widget-macOS-Info.plist
         # Extensions must be sandboxed, which is why they read the App Group.
         ENABLE_APP_SANDBOX: YES
         SKIP_INSTALL: YES
@@ -132,7 +137,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.whitebox.fireworks.ios.widgets
         PRODUCT_NAME: FireworksiOSWidgets
-        INFOPLIST_FILE: Widgets/iOS/Info.plist
+        INFOPLIST_FILE: Config/Widget-iOS-Info.plist
         ENABLE_APP_SANDBOX: YES
         SKIP_INSTALL: YES
       configs:

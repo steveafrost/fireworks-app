@@ -24,42 +24,82 @@ entitlement has to be authorised by a provisioning profile, which an ad-hoc
 signature cannot supply. This is the same wall TestFlight sits behind, so it is
 one piece of account work, not two.
 
-## Account work (needs the Apple ID — cannot be automated)
+## The team, and what is already provisioned
 
-Xcode on this Mac has signing identities but **no provisioning profiles at all**
-(`~/Library/MobileDevice/Provisioning Profiles/` does not exist), so automatic
-signing has nothing to fetch:
+**Team `4QJ25Y85MX`** — the one that has TipTrack deployed. Verified from the App
+Store profile on this Mac:
 
 ```
-error: No profiles for 'com.whitebox.fireworks' were found: Xcode couldn't find
-any Mac App Development provisioning profiles matching 'com.whitebox.fireworks'
-error: Device "F12057 Laptop" isn't registered in your developer account.
+$ security cms -D -i "~/Library/Developer/Xcode/UserData/Provisioning Profiles/146b79e6-....mobileprovision" | plutil -extract Name raw -
+TipTrack App Store Profile
+4QJ25Y85MX
+4QJ25Y85MX.com.steveafrost.tiptrack
 ```
 
-In order:
+Xcode keeps profiles in `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`
+(*not* `~/Library/MobileDevice/`), which is why an earlier check wrongly concluded
+there were none. The same team also holds `com.whitebox.fluency`,
+`com.steveafrost.TimeShadow`, `PocketAquarium`, `ScreenTimeWrapped`, `knightschool`
+and a wildcard `iOS Team Provisioning Profile: *`.
 
-1. **Pick the team.** Two are visible on this Mac and the project currently
-   assumes the second:
-   - `M3HCQ2Y3RS` — the team on *Apple Development: hello@steveafrost.com*
-   - `4QJ25Y85MX` — the team on *Apple Distribution: STEVEN ALLEN FROST*
-   Set it in `project.yml` → `settings.base.DEVELOPMENT_TEAM`.
-2. **Sign in.** Xcode → Settings → Accounts → add the Apple ID for that team.
-   This is what lets profiles be created at all.
-3. **Register the App Group** `group.com.whitebox.fireworks` (developer.apple.com
-   → Identifiers → App Groups), and attach it to three App IDs:
-   `com.whitebox.fireworks`, `com.whitebox.fireworks.widgets`,
-   `com.whitebox.fireworks.ios`, `com.whitebox.fireworks.ios.widgets`.
-4. **Register this Mac** as a development device if the Mac profile asks for it.
+With `-allowProvisioningUpdates`, automatic signing **created the App ID, the App
+Group and the profiles**, so the iOS side needs nothing further:
 
-Then release signing works:
+```
+$ codesign -d --entitlements - build/ipa/.../Fireworks.app
+  application-identifier            4QJ25Y85MX.com.whitebox.fireworks.ios
+  com.apple.security.application-groups  group.com.whitebox.fireworks
+  beta-reports-active               true
+  get-task-allow                    false
+```
+
+## iOS: archive and export (works today)
 
 ```bash
 xcodegen generate
-xcodebuild -project Fireworks.xcodeproj -scheme Fireworks -configuration Release \
-  -allowProvisioningUpdates build            # macOS
 xcodebuild -project Fireworks.xcodeproj -scheme FireworksiOS -configuration Release \
-  -allowProvisioningUpdates -destination 'generic/platform=iOS' build
+  -destination 'generic/platform=iOS' -archivePath build/Fireworks.xcarchive \
+  -allowProvisioningUpdates archive
+
+xcodebuild -exportArchive -archivePath build/Fireworks.xcarchive \
+  -exportPath build/ipa -exportOptionsPlist Config/ExportOptions.plist -allowProvisioningUpdates
 ```
+
+Verified: `** ARCHIVE SUCCEEDED **`, `** EXPORT SUCCEEDED **`, producing
+`build/ipa/Fireworks.ipa`, signed with *Apple Distribution: STEVEN ALLEN FROST
+(4QJ25Y85MX)*, `get-task-allow=false`, `beta-reports-active=true` — a TestFlight
+upload payload.
+
+## What remains for TestFlight
+
+1. An App Store Connect app record for `com.whitebox.fireworks.ios` (portrait
+   phone app; category Utilities or Developer Tools).
+2. An upload credential: an App Store Connect **API key** (`.p8` + key id +
+   issuer id, placed in `~/.appstoreconnect/private_keys/`), then:
+
+   ```bash
+   xcrun altool --upload-app -f build/ipa/Fireworks.ipa -t ios \
+     --apiKey <KEY_ID> --apiIssuer <ISSUER_ID>
+   ```
+
+   Or open the archive in Xcode's Organizer and press Distribute — two clicks,
+   no credential leaves the GUI.
+3. TestFlight → internal testing group → install on the phone.
+
+## The Mac widget still needs one click
+
+The macOS Release build fails with:
+
+```
+error: Device "F12057 Laptop" isn't registered in your developer account. The
+device must be registered in order to be included in a provisioning profile.
+```
+
+A Mac build needs a *Mac* development profile, and that needs this Mac registered
+as a device. Registering is an account action: Xcode → the Fireworks target →
+Signing & Capabilities → tick *Automatically manage signing* (it registers the
+machine), or add it under developer.apple.com → Devices. The Login Item
+(`SMAppService`) has the same requirement, so it is left out until then.
 
 ## Install the running app
 

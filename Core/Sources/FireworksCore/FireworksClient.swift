@@ -80,6 +80,12 @@ public actor FireworksClient {
     }
 
     /// The configured account, or the only one the key can see.
+    ///
+    /// Stores what it finds. It used to only *return* it, which meant a caller
+    /// that passed no account (a fresh install, or a phone) resolved the id,
+    /// logged it, and then built every later URL without it — `POST
+    /// /v1/accounts/usageCosts:query`, which the API answers with 501. A pinned
+    /// account hid the bug, because then the empty case never arose.
     public func resolvedAccount() async throws -> String {
         if !account.isEmpty { return account }
         let found: [String]
@@ -98,6 +104,7 @@ public actor FireworksClient {
                 "This key can see \(found.count) accounts (\(found.joined(separator: ", "))) — "
                 + "choose one in Settings"))
         }
+        account = first
         return first
     }
 
@@ -176,6 +183,24 @@ public actor FireworksClient {
     }
 
     private func send(_ request: URLRequest) async throws -> [String: Any] {
+        do {
+            return try await perform(request)
+        } catch let error as FireworksError {
+            // 501/505 is the one failure worth retrying: iOS `URLSession` will
+            // negotiate HTTP/3 where a Mac does not (and can hold an alt-svc for
+            // it), and an intermediary that cannot carry the method answers this
+            // way. QUIC buys a tiny billing query nothing, so the retry opts out
+            // of it rather than failing the refresh.
+            if case .http(let code, _) = error.kind, code == 501 || code == 505 {
+                var fallback = request
+                fallback.assumesHTTP3Capable = false
+                return try await perform(fallback)
+            }
+            throw error
+        }
+    }
+
+    private func perform(_ request: URLRequest) async throws -> [String: Any] {
         // A key with a stray newline or a pasted arrow must not reach the header
         // as an encoding failure — it is a setup problem, and saying so is the
         // difference between "fix your key" and an unreadable crash.
@@ -192,8 +217,11 @@ public actor FireworksClient {
                 throw FireworksError(kind: .badKey("Fireworks rejected the API key (HTTP \(code))"))
             }
             guard (200..<300).contains(code) else {
-                let message = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
-                throw FireworksError(kind: .http(code, message ?? ""))
+                // Name the request in the failure: "HTTP 501" alone cannot be
+                // acted on, whereas "POST /v1/accounts/…" can.
+                let server = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
+                let where_ = "\(request.httpMethod ?? "GET") \(request.url?.path ?? "?")"
+                throw FireworksError(kind: .http(code, server.map { "\($0) — \(where_)" } ?? where_))
             }
             guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
                 throw FireworksError(kind: .http(code, "the response was not JSON"))
