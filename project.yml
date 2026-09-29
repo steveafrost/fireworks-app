@@ -69,6 +69,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.whitebox.fireworks
         PRODUCT_NAME: Fireworks
         INFOPLIST_FILE: Mac/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # A menu-bar app: no Dock icon, no main window, no app switcher entry.
         # `LSUIElement` is set in Info.plist; the popover is the whole UI.
         ENABLE_APP_SANDBOX: NO
@@ -81,7 +82,15 @@ targets:
     type: app-extension
     platform: macOS
     sources:
+      # The app icon belongs to the app, not the extension.
       - path: Shared
+        excludes:
+          # The app icon belongs to the app, and the offscreen render harness is a
+          # macOS-only CLI path neither extension runs. An AppKit import inside an
+          # extension target also trips dependency scanning: "Unable to resolve
+          # module dependency: 'AppKit' (in target 'FireworksiOSWidgets')".
+          - "Assets/**"
+          - "UISnapshot.swift"
       - path: Widgets
     dependencies:
       - package: FireworksCore
@@ -117,6 +126,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.whitebox.fireworks.ios
         PRODUCT_NAME: Fireworks
         INFOPLIST_FILE: iOS/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         ENABLE_APP_SANDBOX: YES
       configs:
@@ -129,6 +139,13 @@ targets:
     platform: iOS
     sources:
       - path: Shared
+        excludes:
+          # The app icon belongs to the app, and the offscreen render harness is a
+          # macOS-only CLI path neither extension runs. An AppKit import inside an
+          # extension target also trips dependency scanning: "Unable to resolve
+          # module dependency: 'AppKit' (in target 'FireworksiOSWidgets')".
+          - "Assets/**"
+          - "UISnapshot.swift"
       - path: Widgets
     dependencies:
       - package: FireworksCore
