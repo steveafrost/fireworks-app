@@ -1,10 +1,14 @@
 import Foundation
 
-/// The two calls a reading needs. A protocol so tests can drive the whole
-/// refresh path (windows, failure fallbacks, alert planning) with no network.
+/// The calls a reading needs. A protocol so tests can drive the whole refresh
+/// path (windows, failure fallbacks, alert planning) with no network.
 public protocol CostSource: Sendable {
     func totalSpend(from start: Date, to end: Date) async throws -> CostWindow
     func costs(start: Date, end: Date, groupBy: [String]) async throws -> CostWindow
+    /// The account's real balance. A source that cannot answer *throws*: the
+    /// reading then falls back to the anchored estimate rather than inventing a
+    /// figure, which is the whole difference between a balance and a guess.
+    func balance() async throws -> CreditBalance
 }
 
 extension FireworksClient: CostSource {}
@@ -34,6 +38,9 @@ public actor RefreshService {
     /// Requests in flight at once. A day per request is a round trip each, so they
     /// overlap — but 30 at once is a burst the API has no reason to allow.
     public static let dayConcurrency = 6
+    /// Windows shorter than this are not measured — the API rejects a span of no
+    /// length, and a balance-with-no-spend reading is the truthful answer.
+    public static let minimumWindow: TimeInterval = 60
 
     public init() {}
 
@@ -50,10 +57,29 @@ public actor RefreshService {
 
         let window: CostWindow
         let today: CostWindow
+        // A window shorter than a minute is not worth asking about, and the API
+        // refuses it outright — `totalSpend` over a span of no length comes back
+        // `HTTP 400 validation failed`. That case is real now that a first run
+        // adopts the live balance as its anchor (and it was already reachable by
+        // setting an anchor to "now"), and the honest reading of it is zero: the
+        // spend since an anchor set seconds ago is zero by definition, and the
+        // balance is known, so there is nothing to guess at.
+        let measurable = now.timeIntervalSince(anchorTime) >= Self.minimumWindow
+        let sinceMidnight = Time.todayWindow(now: now).0
+        // The balance is a different host and a different protocol, so it goes
+        // out alongside the spend queries rather than adding itself to the
+        // refresh. A gateway that cannot answer is *not* a failed refresh: the
+        // anchored estimate is still a reading.
+        let balanceTask: Task<CreditBalance?, Never>? = config.liveBalance
+            ? Task { try? await source.balance() }
+            : nil
         do {
-            window = try await source.totalSpend(from: anchorTime, to: now)
-            today = try await source.costs(start: Time.todayWindow(now: now).0,
-                                           end: now, groupBy: ["MODEL"])
+            window = measurable
+                ? try await source.totalSpend(from: anchorTime, to: now)
+                : CostWindow()
+            today = now.timeIntervalSince(sinceMidnight) >= Self.minimumWindow
+                ? try await source.costs(start: sinceMidnight, end: now, groupBy: ["MODEL"])
+                : CostWindow()
         } catch let error as FireworksError {
             // A failed measurement is not a reason to invent a number: show the
             // last good reading and say how old it is.
@@ -65,12 +91,18 @@ public actor RefreshService {
                                   isStale: previous != nil)
         }
 
+        var live: CreditBalance?
+        if let balanceTask { live = await balanceTask.value }
+
         let days = await daySeries(source: source, now: now, todayCost: today.subtotal,
                                    days: config.historyDays, previous: previous?.days ?? [])
 
+        // The gateway's figure wins outright when it exists: it is the credit
+        // that is actually left, not the credit the anchor says should be.
+        let estimate = Money.rounded(remainingAmount(anchorBalance: config.anchorBalance,
+                                                     spend: window.subtotal))
         var reading = Reading(
-            remaining: Money.rounded(remainingAmount(anchorBalance: config.anchorBalance,
-                                                     spend: window.subtotal)),
+            remaining: Money.rounded(live?.amount ?? estimate),
             spend: Money.rounded(window.subtotal),
             today: Money.rounded(today.subtotal),
             models: window.models.mapValues { Money.rounded($0) },
@@ -79,7 +111,8 @@ public actor RefreshService {
             hoursToday: (now.timeIntervalSince(Time.todayWindow(now: now).0) / 3600),
             anchorBalance: config.anchorBalance,
             anchorTime: anchorTime,
-            fetchedAt: now)
+            fetchedAt: now,
+            liveBalance: live.map { Money.rounded($0.amount) })
 
         let (events, memory) = Alerts.plan(reading: reading, config: config,
                                            previous: previous?.alerts,

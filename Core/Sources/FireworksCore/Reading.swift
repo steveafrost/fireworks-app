@@ -33,6 +33,29 @@ public struct Reading: Codable, Sendable, Equatable {
     /// Crossing memory for the alerts, carried with the reading so an alert can
     /// never fire twice for the same crossing.
     public var alerts: AlertMemory?
+    /// The balance the gateway reported, when it could be reached. `remaining`
+    /// is this figure verbatim in that case; nil means `remaining` is the
+    /// anchored estimate (`anchor_balance − rated spend since the anchor`).
+    public var liveBalance: Double?
+
+    /// True when `remaining` is the anchored estimate rather than the account's
+    /// real balance — the popover says so rather than passing an estimate off as
+    /// the truth.
+    public var isEstimated: Bool { liveBalance == nil }
+
+    /// Which figure `remaining` is, in the two words the popover has room for.
+    public var sourceWord: String { isEstimated ? "anchor estimate" : "live balance" }
+
+    /// The line under the credit bar: what was spent, which figure the number
+    /// above it is, and when it was measured.
+    ///
+    /// In Core rather than in the view because it is one string with two states,
+    /// and the popover it appears in cannot be screenshotted on a Mac without
+    /// Screen Recording permission — so it is verified by test.
+    public func footnote() -> String {
+        "\(Money.formatted(spend)) spent since \(Time.compactStamp(anchorTime))"
+            + " · \(sourceWord) · updated \(Time.clock(fetchedAt))"
+    }
 
     public enum CodingKeys: String, CodingKey {
         case remaining, spend, today, models, days, hours, alerts
@@ -40,6 +63,7 @@ public struct Reading: Codable, Sendable, Equatable {
         case anchorBalance = "anchor_balance"
         case anchorTime = "anchor_time"
         case fetchedAt = "fetched_at"
+        case liveBalance = "live_balance"
         case costUsd = "cost"
     }
 
@@ -58,11 +82,13 @@ public struct Reading: Codable, Sendable, Equatable {
         try values.encode(anchorTime, forKey: .anchorTime)
         try values.encode(fetchedAt, forKey: .fetchedAt)
         try values.encodeIfPresent(alerts, forKey: .alerts)
+        try values.encodeIfPresent(liveBalance, forKey: .liveBalance)
     }
 
     public init(remaining: Double, spend: Double, today: Double, models: [String: Double],
                 days: [DayTotal], hours: Double, hoursToday: Double, anchorBalance: Double,
-                anchorTime: Date, fetchedAt: Date, alerts: AlertMemory? = nil) {
+                anchorTime: Date, fetchedAt: Date, alerts: AlertMemory? = nil,
+                liveBalance: Double? = nil) {
         self.remaining = remaining
         self.spend = spend
         self.today = today
@@ -74,6 +100,7 @@ public struct Reading: Codable, Sendable, Equatable {
         self.anchorTime = anchorTime
         self.fetchedAt = fetchedAt
         self.alerts = alerts
+        self.liveBalance = liveBalance
     }
 
     public init(from decoder: Decoder) throws {
@@ -89,6 +116,7 @@ public struct Reading: Codable, Sendable, Equatable {
         anchorTime = (try? values.decode(Date.self, forKey: .anchorTime)) ?? .distantPast
         fetchedAt = (try? values.decode(Date.self, forKey: .fetchedAt)) ?? .distantPast
         alerts = try? values.decodeIfPresent(AlertMemory.self, forKey: .alerts)
+        liveBalance = try? values.decodeIfPresent(Double.self, forKey: .liveBalance)
     }
 
     public var share: Double {

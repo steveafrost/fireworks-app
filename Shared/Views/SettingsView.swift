@@ -73,7 +73,15 @@ public struct SettingsView: View {
     }
 
     private var anchorSection: some View {
-        Section("Balance anchor") {
+        Section("Balance") {
+            Toggle("Ask Fireworks for the real balance", isOn: Binding(
+                get: { model.config.liveBalance },
+                set: { value in model.update { $0.liveBalance = value } }
+            ))
+            Text(FireworksConfig.balanceSourceHint(live: model.config.liveBalance))
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Text("Balance held")
                 Spacer()
@@ -97,10 +105,6 @@ public struct SettingsView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
-            Text("Fireworks has no balance endpoint, so the app cannot ask what is left. It subtracts measured spend from this anchor instead, and always shows the anchor alongside the figure.")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

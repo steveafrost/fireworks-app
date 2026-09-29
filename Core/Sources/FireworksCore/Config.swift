@@ -25,10 +25,14 @@ public enum AppGroup {
 public struct FireworksConfig: Codable, Sendable, Equatable {
     /// Blank = discover it from the API key via `GET /v1/accounts`.
     public var account: String = ""
-    /// The balance held at `anchorTime` — the figure the remaining amount is
-    /// measured down from, because the API cannot report a balance itself.
+    /// The balance held at `anchorTime`. It is the *fallback* figure: the
+    /// account gateway reports the real balance (see `BalanceRPC`), and this is
+    /// what the app measures down from when that call cannot be made.
     public var anchorBalance: Double = 0
     public var anchorTime: Date?
+    /// Ask the account gateway for the real balance on every refresh. Off means
+    /// the anchored estimate is used and no call is made to the gateway.
+    public var liveBalance: Bool = true
     /// The title turns amber/red at these amounts, and they drive the
     /// low/critical alerts.
     public var lowThreshold: Double = 3.00
@@ -51,6 +55,7 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
         case account
         case anchorBalance = "anchor_balance"
         case anchorTime = "anchor_time"
+        case liveBalance = "live_balance"
         case lowThreshold = "low_threshold"
         case criticalThreshold = "critical_threshold"
         case historyDays = "history_days"
@@ -70,6 +75,7 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
         anchorBalance = (try? values.decode(Double.self, forKey: .anchorBalance))
             ?? defaults.anchorBalance
         anchorTime = try? values.decodeIfPresent(Date.self, forKey: .anchorTime)
+        liveBalance = (try? values.decode(Bool.self, forKey: .liveBalance)) ?? defaults.liveBalance
         lowThreshold = (try? values.decode(Double.self, forKey: .lowThreshold))
             ?? defaults.lowThreshold
         criticalThreshold = (try? values.decode(Double.self, forKey: .criticalThreshold))
@@ -126,6 +132,18 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
             ? "Blank is normal — the app asks the key which account it can see."
             : "Blank is normal — the app asked the key and found \(resolved). "
               + "Fill this in only if the key can see several accounts and it has to be told which one."
+    }
+
+    /// What the balance toggle means, in the words the settings panel shows.
+    ///
+    /// Here rather than in the view for the same reason `accountHint` is: the
+    /// settings pane is a `Form`, which the offscreen renderer draws as nothing,
+    /// so this copy is verified by test rather than by looking at a picture.
+    public static func balanceSourceHint(live: Bool) -> String {
+        live
+            ? "On — the app asks the account gateway what the balance is (the figure "
+              + "firectl prints) and falls back to the anchor only if that call cannot be made."
+            : "Off — no balance call is made, so what is left is the anchor minus measured spend."
     }
 
     public var isAnchored: Bool {

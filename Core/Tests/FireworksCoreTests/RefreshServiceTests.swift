@@ -89,6 +89,9 @@ final class RefreshServiceTests: XCTestCase {
                 if end.timeIntervalSince(start) > 26 * 3600 { return CostWindow(subtotal: 1.26) }
                 throw FireworksError(kind: .http(500, "day failed"))
             }
+            func balance() async throws -> CreditBalance {
+                throw FireworksError(kind: .transport("gateway unreachable"))
+            }
         }
         let outcome = await RefreshService().refresh(config: config, previous: previous,
                                                      source: DayBroken(today: now), now: now)

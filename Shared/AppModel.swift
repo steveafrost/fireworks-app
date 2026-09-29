@@ -89,6 +89,13 @@ public final class AppModel {
     // MARK: - measuring
 
     public func refresh() async {
+        // The anchor exists only because the REST API cannot report a balance.
+        // It can now be looked up, so a fresh install fills it in rather than
+        // stopping to ask for a number the gateway will hand over.
+        if !config.isAnchored, let adopted = await adoptLiveAnchor() {
+            Diagnostics.log("refresh: anchor auto-set to \(Money.formatted(adopted)) "
+                            + "from the live balance")
+        }
         guard config.isAnchored else {
             status = .needsAnchor
             Diagnostics.log("refresh: skipped — no anchor yet (balance=\(config.anchorBalance))")
@@ -135,6 +142,7 @@ public final class AppModel {
                 Diagnostics.log("refresh: ok remaining=\(Money.formatted(reading?.remaining ?? 0)) "
                                 + "spend=\(Money.formatted(reading?.spend ?? 0)) "
                                 + "today=\(Money.formatted(reading?.today ?? 0)) "
+                                + "balance=\(reading?.isEstimated == false ? "live" : "anchor") "
                                 + "account=\(resolved) events=\(outcome.events.count)")
                 await notifier.deliver(outcome.events, enabled: config.notify)
             }
@@ -184,6 +192,26 @@ public final class AppModel {
             return try KeyStore.read(service: service, directory: SharedContainer.directory)
         }
         return try KeyStore.read(service: nil, directory: SharedContainer.directory)
+    }
+
+    /// First run: take the balance the gateway reports as the anchor.
+    ///
+    /// The anchor exists only because the REST API cannot report a balance, so
+    /// the app used to stop and ask for a number it can now look up. This only
+    /// fills the gap — an anchor the user set is never overwritten — so a fresh
+    /// install measures something immediately instead of waiting to be taught.
+    private func adoptLiveAnchor() async -> Double? {
+        guard config.liveBalance, !config.isAnchored else { return nil }
+        guard let found = try? resolveKey() else { return nil }
+        keySource = found.source
+        let client = FireworksClient(apiKey: found.key, account: config.account)
+        guard let resolved = try? await client.resolvedAccount(),
+              let balance = try? await client.balance(),
+              balance.amount > 0 else { return nil }
+        account = resolved
+        config.account = resolved
+        setAnchor(balance.amount, at: balance.fetchedAt)
+        return balance.amount
     }
 
     // MARK: - settings

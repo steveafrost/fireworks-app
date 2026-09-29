@@ -2,27 +2,43 @@
 
 Remaining Fireworks AI credit in your menu bar, in a widget, and on your iPhone.
 
-Fireworks is prepaid. Their API returns rated **cost**, not **balance** — every
-balance-shaped endpoint answers 404 (`billing/summary`, `billing/balance`,
-`balance`, `credits`, `billing/usage` were each re-measured against the live API).
-So the app does the only honest thing available:
+Fireworks is prepaid, and its **REST** API returns rated **cost**, not
+**balance** — every balance-shaped route answers 404 (`billing/summary`,
+`billing/balance`, `balance`, `credits`, `billing/usage` were each re-measured
+against the live API).
+
+The balance does exist, though, on the *control-plane gateway*: Fireworks' own
+CLI is a gRPC client, and `firectl account get` prints `Balance: USD 7.75` from
+`gateway.Gateway/GetBalance` on `gateway.fireworks.ai` — authenticated with the
+same API key, in an `x-api-key` header rather than a bearer token. That call is
+HTTP/2, which `URLSession` already speaks, and the message is two fields wide, so
+the app reads the real figure with no gRPC library and no generated protos (see
+`Core/Sources/FireworksCore/Balance.swift`).
 
 ```
-remaining = anchor_balance − rated spend from anchor_time → now
+remaining = the account's real balance          # preferred
+remaining = anchor_balance − rated spend        # fallback, and all there used to be
 ```
 
-You tell it the balance you hold (once, from the billing page or a top-up), and
-everything after that anchor is measured spend. The anchor is always shown
-alongside the figure, so a subtraction is never mistaken for something Fireworks
-reported.
+So the number is now the one Fireworks reports, and the anchor is only what
+stands in when the gateway cannot be reached — a distinction the popover makes
+explicit (`live balance` vs `anchor estimate` in the line under the credit bar).
+A first run adopts the live balance as its anchor, so a fresh install no longer
+has to be taught a figure the API will hand over, and the anchor is never
+overwritten once it exists. Turning the call off in Settings leaves the old
+subtraction and makes no request to the gateway.
+
+Credit *added* is available too, from the same gateway (`ListInvoices` returns the
+prepaid top-ups: they are what `firectl billing list-invoices` prints). Not read
+yet — the balance alone is enough to stop guessing.
 
 ## Layout
 
 | Path | What it is |
 |---|---|
 | `Core/` | Swift package: the whole engine, no UI, no third-party dependencies |
-| `Core/Sources/FireworksCore/` | API client, config, anchor math, day series, alert planning, key handling |
-| `Core/Tests/FireworksCoreTests/` | 45 tests, no network, no simulator (`swift test`) |
+| `Core/Sources/FireworksCore/` | API client, balance gateway call, config, anchor math, day series, alert planning, key handling |
+| `Core/Tests/FireworksCoreTests/` | 68 tests, no network, no simulator (`swift test`) |
 | `project.yml` | XcodeGen spec for the app + widget targets (the `.xcodeproj` is generated, never committed) |
 | `Mac/` | menu-bar app (no Dock icon, popover UI) |
 | `iOS/` | iPhone/iPad app |

@@ -29,6 +29,19 @@ struct FakeSource: CostSource {
     ]
     var dayCosts: [String: Double] = ["2026-09-17": 1.2587]
     var failure: FireworksError?
+    /// What the account gateway answers. Nil by default, i.e. a gateway that
+    /// cannot be reached — so every expectation written before the live balance
+    /// existed is still testing the anchored fallback.
+    var live: Double?
+    var liveFailure: FireworksError?
+
+    func balance() async throws -> CreditBalance {
+        if let liveFailure { throw liveFailure }
+        guard let live else {
+            throw FireworksError(kind: .transport("gateway unreachable"))
+        }
+        return CreditBalance(amount: live, currency: "USD", fetchedAt: Date())
+    }
 
     func costs(start: Date, end: Date, groupBy: [String]) async throws -> CostWindow {
         if let failure { throw failure }

@@ -107,8 +107,7 @@ public struct OverviewView: View {
 
             CreditBar(fraction: reading.share, ink: ink(reading))
 
-            Text("\(Money.formatted(reading.spend)) spent since \(Time.compactStamp(reading.anchorTime))"
-                 + " · updated \(Time.clock(reading.fetchedAt))")
+            Text(reading.footnote())
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
