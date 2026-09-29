@@ -98,6 +98,19 @@ public enum Time {
         date.formatted(.dateTime.day().month(.abbreviated).year().hour().minute())
     }
 
+    /// A compact stamp for a subtitle or a narrow column: "Fri 25 Sep 13:36".
+    ///
+    /// A fixed pattern rather than a localized template, because the templates
+    /// expand ("September 25, 2026 at 1:36 PM") and this rides beside a section
+    /// heading, where a long date pushes the heading off its own line. The
+    /// locale still supplies the weekday and month names.
+    public static func compactStamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateFormat = "EEE d MMM HH:mm"
+        return formatter.string(from: date)
+    }
+
     /// The rate a forecast uses: the current pace when there is one, otherwise
     /// the since-anchor average (which every idle hour dilutes).
     public static func dailyRate(todaySpend: Double, hoursToday: Double,
