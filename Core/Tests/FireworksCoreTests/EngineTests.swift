@@ -180,6 +180,18 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.notifyPercent, [70])
     }
 
+    func testTheAccountFieldExplainsItselfInBothStates() {
+        // Blank is the normal setting, and the note says which account the key
+        // resolved — the question an empty optional field raises.
+        XCTAssertEqual(FireworksConfig.accountHint(configured: "", resolved: ""),
+                       "Blank is normal — the app asks the key which account it can see.")
+        let detected = FireworksConfig.accountHint(configured: "", resolved: "f12057")
+        XCTAssertTrue(detected.contains("found f12057"), detected)
+        let pinned = FireworksConfig.accountHint(configured: "f12057", resolved: "f12057")
+        XCTAssertTrue(pinned.contains("Set to f12057"), pinned)
+        XCTAssertTrue(pinned.contains("Clear the field"), pinned)
+    }
+
     func testThePaceHorizonSurvivesGarbageAndOff() {
         var config = FireworksConfig()
         XCTAssertEqual(config.paceHorizonDays, 3)          // the default the panel uses

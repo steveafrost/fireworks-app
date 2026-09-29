@@ -117,7 +117,10 @@ public enum UISnapshot {
                 .padding(Rhythm.inset)
                 .frame(width: Rhythm.width, alignment: .leading)),
              CGSize(width: 340, height: 430)),
-            ("settings", AnyView(SettingsView().environment(model)), CGSize(width: 460, height: 760)),
+            // No settings panel here: it is a `Form`, and the offscreen renderer
+            // draws one as nothing at all. A blank image is worse than no image —
+            // it reads as a broken pane. The account hint is a Core function
+            // covered by a test instead.
             ("probe", AnyView(probe), CGSize(width: 340, height: 340))
         ]
     }

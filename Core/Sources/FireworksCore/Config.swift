@@ -110,6 +110,24 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
         effectiveThresholds.map(String.init).joined(separator: ",")
     }
 
+    /// What the account field means, in the words the settings panel shows.
+    ///
+    /// Here rather than in the view because it is the only place the app explains
+    /// the field, and the explanation is a rule about settings: blank means "ask
+    /// the key", and anything else means "use this and do not ask". The settings
+    /// pane is a `Form`, which the offscreen renderer draws as nothing, so this
+    /// string is verified by test rather than by looking at a picture.
+    public static func accountHint(configured: String, resolved: String) -> String {
+        guard configured.isEmpty else {
+            return "Set to \(configured), so the app will not ask. "
+                + "Clear the field to let it work the account out from the key again."
+        }
+        return resolved.isEmpty
+            ? "Blank is normal — the app asks the key which account it can see."
+            : "Blank is normal — the app asked the key and found \(resolved). "
+              + "Fill this in only if the key can see several accounts and it has to be told which one."
+    }
+
     public var isAnchored: Bool {
         anchorBalance > 0 && anchorTime != nil
     }

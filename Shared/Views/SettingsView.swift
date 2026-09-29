@@ -194,7 +194,7 @@ public struct SettingsView: View {
                 }
             }
             HStack {
-                TextField("Account", text: Binding(
+                TextField("Account (optional)", text: Binding(
                     get: { model.config.account },
                     set: { value in model.update { $0.account = value } }
                 ))
@@ -203,9 +203,17 @@ public struct SettingsView: View {
                     Task { await model.refresh() }
                 }
             }
-            Text("Blank account = detected from the key each launch. Pin it to measure a different account.")
+            // The field reads like a second key until the note says otherwise, and
+            // it is not one — blank is the normal setting. The id the app worked out
+            // is shown here rather than written into the field, so the field stays
+            // empty and the app keeps asking the key. The wording lives in Core so
+            // it can be tested; this pane is a Form, which the offscreen renderer
+            // draws as nothing, so a picture is not available for it.
+            Text(FireworksConfig.accountHint(configured: model.config.account,
+                                             resolved: model.account))
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
