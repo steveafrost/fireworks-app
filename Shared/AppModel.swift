@@ -45,7 +45,14 @@ public final class AppModel {
         SharedContainer.applyEnvironmentSeed(to: &config)
         status = config.isAnchored ? .idle : .needsAnchor
         let dataPath = SharedContainer.directory.path
-        let pluginPath = SharedContainer.pluginDirectory?.path ?? "—"
+        // Name the plugin directory only when it is actually there. It is a
+        // one-time migration source, and printing the path on a Mac that never ran
+        // the plugin (or has since deleted it) reads as if the app were reading it
+        // every launch.
+        let pluginURL = SharedContainer.pluginDirectory
+        let pluginPath = pluginURL.flatMap {
+            FileManager.default.fileExists(atPath: $0.path) ? $0.path : nil
+        } ?? "none"
         let migrated = carried.isEmpty ? "nothing" : carried.joined(separator: ",")
         let anchorStamp = config.anchorTime.map { Time.isoUTC($0) } ?? "—"
         Diagnostics.log("launch: data=\(dataPath) plugin=\(pluginPath) migrated=\(migrated) "
