@@ -96,11 +96,14 @@ struct MenuBarLabel: View {
 /// itself cannot be screenshotted on a Mac where Screen Recording is denied and
 /// "does the ring encode the fraction" is a question about pixels.
 enum MenuBarDial {
-    /// 18pt × 0.95 — the plugin's size read a touch large beside the system's own
-    /// items. The stroke stays 2pt, so a smaller canvas keeps the ring's weight
-    /// instead of washing out to a hairline.
-    static let size: CGFloat = 17.1
-    static let stroke: CGFloat = 2
+    /// Sized to the Control Center glyph, not to the plugin. In a menu-bar crop
+    /// the old dial's ink measured 113px against Control Center's 91px and the
+    /// calendar's 105px, i.e. a ring a quarter taller than the system items it
+    /// sits between. 14pt here draws 13pt of ink — the same height as Control
+    /// Center at that scale — and the stroke drops to 1.8pt so the ring stays a
+    /// ring rather than thickening as the canvas shrinks.
+    static let size: CGFloat = 14
+    static let stroke: CGFloat = 1.8
     /// Alpha of the unfilled track. High enough to read as a ring, low enough
     /// that the filled arc is obviously the figure.
     static let trackAlpha: CGFloat = 70.0 / 255.0
