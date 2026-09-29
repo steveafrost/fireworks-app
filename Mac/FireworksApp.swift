@@ -96,7 +96,10 @@ struct MenuBarLabel: View {
 /// itself cannot be screenshotted on a Mac where Screen Recording is denied and
 /// "does the ring encode the fraction" is a question about pixels.
 enum MenuBarDial {
-    static let size: CGFloat = 18
+    /// 18pt × 0.95 — the plugin's size read a touch large beside the system's own
+    /// items. The stroke stays 2pt, so a smaller canvas keeps the ring's weight
+    /// instead of washing out to a hairline.
+    static let size: CGFloat = 17.1
     static let stroke: CGFloat = 2
     /// Alpha of the unfilled track. High enough to read as a ring, low enough
     /// that the filled arc is obviously the figure.
