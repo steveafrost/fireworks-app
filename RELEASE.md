@@ -73,6 +73,25 @@ open -a /Applications/Fireworks.app
 
 The app has no Dock icon and no window: it is the menu-bar item and its popover.
 
+## Verifying the UI without a screenshot
+
+Screen Recording permission is denied on this Mac, so `screencapture` returns an
+empty image. The app can render its own panels offscreen instead:
+
+```bash
+/Applications/Fireworks.app/Contents/MacOS/Fireworks --render-ui /tmp/fireworks-ui --render-ui-sample
+```
+
+That writes `popover.png`, `popover-empty.png`, `settings.png` and `probe.png`
+(`probe` lays the components out in isolation, so a rendering fault can be told
+apart from a layout one). `--render-ui-sample` swaps in a synthetic reading so
+low, critical and over-anchor states can be looked at without waiting for them.
+
+Two limits, both of which have already been mistaken for app bugs: text drawn
+directly onto the transparent canvas is dropped (every panel is therefore drawn
+over an opaque fill), and `Toggle`/`Button`/`Link` come out as a placeholder
+glyph. Use this for the numbers and the arrangement; check controls on screen.
+
 ## Settings and data
 
 - Data folder: `~/Library/Application Support/Fireworks/` — `config.json`,

@@ -217,4 +217,26 @@ public final class AppModel {
                                        message: "Fireworks \(Money.formatted(reading?.remaining ?? 0)) left",
                                        subtitle: "This is what a credit alert looks like"))
     }
+
+    #if DEBUG
+    /// Replace the reading with a synthetic one, for `--render-ui-sample`.
+    /// Deliberately loud about it: a preview state must never be mistaken for
+    /// measured data.
+    public func previewInstallSampleReading() {
+        let now = Date()
+        reading = Reading(remaining: 2.34, spend: 17.66, today: 1.94, models: [
+            "accounts/fireworks/models/deepseek-v4p1-flash": 9.42,
+            "accounts/fireworks/models/glm-5p3-flash": 6.10,
+            "accounts/fireworks/models/qwen3-coder-480b": 1.64,
+            "accounts/fireworks/models/llama-v3p3-70b": 0.50
+        ], days: (0..<7).map { offset in
+            let day = Calendar.current.date(byAdding: .day, value: offset - 6, to: now) ?? now
+            return DayTotal(date: Time.label(for: day),
+                            cost: [0.11, 1.94, 1.27, 0.11, 0, 0.09, 1.94][offset],
+                            today: offset == 6)
+        }, hours: 96, hoursToday: 14, anchorBalance: 20.00,
+           anchorTime: now.addingTimeInterval(-4 * 86_400), fetchedAt: now)
+        status = .idle
+    }
+    #endif
 }

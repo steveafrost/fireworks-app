@@ -63,6 +63,12 @@ cp -R build/dd/Build/Products/Debug/Fireworks.app /Applications/ && open -a /App
 Debug builds are ad-hoc signed, so they run on any Mac with no Apple account;
 Release builds carry the App Group entitlements the widget and TestFlight need.
 
+To look at the UI without screen-recording permission (which this Mac denies):
+
+```bash
+/Applications/Fireworks.app/Contents/MacOS/Fireworks --render-ui /tmp/fireworks-ui --render-ui-sample
+```
+
 ## Distribution
 
 Signed with the Developer ID and notarized, shipped as a DMG and a Homebrew cask.

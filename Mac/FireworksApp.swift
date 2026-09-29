@@ -36,9 +36,13 @@ struct FireworksApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("FIREWORKS delegate didFinishLaunching")
         NSApp.setActivationPolicy(.accessory)
         Diagnostics.log("launch: delegate didFinishLaunching")
+        if let directory = UISnapshot.requestedDirectory {
+            UISnapshot.render(to: directory, model: AppModel.shared)
+            NSApp.terminate(nil)
+            return
+        }
         Task { await AppModel.shared.start() }
     }
 
