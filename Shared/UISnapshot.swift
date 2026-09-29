@@ -108,7 +108,7 @@ public enum UISnapshot {
         // to nothing, which looks exactly like a layout bug in the app. The real
         // popover is sized by its content, so the snapshot has to allow for it.
         [
-            ("popover", AnyView(OverviewView().environment(model)), CGSize(width: 340, height: 505)),
+            ("popover", AnyView(OverviewView(onOpenSettings: {}).environment(model)), CGSize(width: 340, height: 505)),
             // The setup screen is what a fresh install sees, so its preview gets
             // the same shell the popover puts it in — the surface and the inset.
             // Drawn bare it sat flush against the window edge, and the review was

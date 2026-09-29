@@ -132,16 +132,31 @@ public struct OverviewView: View {
         VStack(alignment: .leading, spacing: 9) {
             Rule()
 
-            AlertsRow()
-
+            // Icons, not a row of text links: labels here competed with the
+            // numbers above them, and each of these answers to a hover. The
+            // alerts line moved out entirely — its toggle and its thresholds
+            // both live in Settings, next to the notification permission it
+            // depends on.
             HStack(spacing: 14) {
                 if let onOpenSettings {
-                    Button("Settings…", action: onOpenSettings)
-                        .footerLink()
+                    Button {
+                        onOpenSettings()
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Settings…")
                 }
-                Link("Billing at Fireworks", destination: URL(string: "https://app.fireworks.ai/account/billing")!)
-                    .footerLink()
+                Button {
+                    open("https://app.fireworks.ai/account/billing")
+                } label: {
+                    Image(systemName: "dollarsign.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Fireworks billing")
+
                 Spacer(minLength: 6)
+
                 if case .refreshing = model.status {
                     ProgressView().controlSize(.mini)
                 }
@@ -152,14 +167,28 @@ public struct OverviewView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Refresh now")
-                Link(destination: URL(string: "https://github.com/steveafrost/fireworks-app")!) {
+                Button {
+                    open("https://github.com/steveafrost/fireworks-app")
+                } label: {
                     Image(systemName: "questionmark.circle")
                 }
                 .buttonStyle(.borderless)
                 .help("Why {remaining} is a subtraction, not a figure Fireworks reported")
             }
-            .font(.system(size: 11))
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
         }
+    }
+
+    /// Opening a URL from the footer. Buttons rather than `Link`s: they look the
+    /// same in a popover (no hover preview, no middle-click), and a row of one
+    /// Button among three Links rendered as three placeholders and a hole in the
+    /// app's own screenshot — which is how the missing icon was noticed at all.
+    private func open(_ string: String) {
+        guard let url = URL(string: string) else { return }
+        #if os(macOS)
+        NSWorkspace.shared.open(url)
+        #endif
     }
 
     // MARK: - small helpers
@@ -225,50 +254,6 @@ public struct OverviewView: View {
     private func paceTint(_ reading: Reading) -> Color {
         guard let left = reading.daysLeft else { return .secondary }
         return left < 3 ? Palette.red(scheme) : Color.primary
-    }
-}
-
-/// The footer's plain-text links. macOS has a link button style that paints the
-/// accent colour and underlines on hover — exactly what a popover footer wants —
-/// and it does not exist on iOS, where these rows are never drawn (the phone has
-/// its own root view). Hence the `#if`, rather than a borderless button that
-/// looks like a label on the Mac.
-private extension View {
-    @ViewBuilder
-    func footerLink() -> some View {
-        #if os(macOS)
-        buttonStyle(.link)
-        #else
-        buttonStyle(.borderless)
-        #endif
-    }
-}
-
-/// The alerts line: what is armed, and a one-click way to change it. The plugin
-/// had this row because a menu is the only UI it has; the app keeps it because
-/// "is it going to warn me?" is a question you ask *after* the fact.
-struct AlertsRow: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: model.config.notify ? "bell" : "bell.slash")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-            Text(Alerts.armedSummary(config: model.config))
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 6)
-            Toggle("", isOn: Binding(
-                get: { model.config.notify },
-                set: { value in model.update { $0.notify = value } }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-        }
     }
 }
 
