@@ -146,6 +146,22 @@ public struct SettingsView: View {
                        }
                    ))
             HStack {
+                // The one place the fire's horizon is set — three days by default,
+                // 0 to switch the mark off.
+                Text("Fire 🔥 under")
+                Spacer()
+                TextField("3", text: Binding(
+                    get: { String(model.config.paceHorizonDays) },
+                    set: { text in
+                        let value = Int(text.filter(\.isNumber)) ?? 0
+                        model.update { $0.paceHorizonDays = value }
+                    }
+                ))
+                .frame(width: 44)
+                .textFieldStyle(.roundedBorder)
+                Text("days left").foregroundStyle(.secondary)
+            }
+            HStack {
                 Button("Send a test alert") {
                     Task { _ = await model.testNotification() }
                 }

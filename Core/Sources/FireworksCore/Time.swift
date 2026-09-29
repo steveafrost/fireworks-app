@@ -121,12 +121,19 @@ public enum Time {
         return formatter.string(from: date)
     }
 
-    /// The rate a forecast uses: the current pace when there is one, otherwise
-    /// the since-anchor average (which every idle hour dilutes).
+    /// The rate a forecast uses: today's pace blended with the window average.
+    ///
+    /// A partial day projects badly — eight good hours of work on a quiet
+    /// afternoon reads as a runaway rate — while the window average lags by
+    /// however long the anchor has been open. Neither alone is the rate; the mean
+    /// is, so one heavy day moves the forecast without owning it. The average
+    /// carries the case where too little of today has passed to project at all,
+    /// and the pace carries a fresh anchor with no window behind it yet.
     public static func dailyRate(todaySpend: Double, hoursToday: Double,
                                  spend: Double, hours: Double) -> Double {
         let pace = hoursToday >= 1 ? todaySpend / hoursToday * 24 : 0
         let average = hours > 0.05 ? spend / hours * 24 : 0
+        if pace > 0 && average > 0 { return (pace + average) / 2 }
         return pace > 0 ? pace : average
     }
 }

@@ -60,7 +60,7 @@ public struct OverviewView: View {
             HStack(spacing: 8) {
                 Tile(title: "Today", value: Money.formatted(reading.today), note: averageNote(reading))
                 Tile(title: "Pace", value: "\(Money.formatted(reading.dailyRate))/day",
-                     note: paceNote(reading), tint: paceTint(reading))
+                     note: paceNote(reading), badge: paceBadge(reading))
             }
 
             if !reading.models.isEmpty {
@@ -247,13 +247,14 @@ public struct OverviewView: View {
         return String(format: "~%.1f days left", left)
     }
 
-    /// The pace tile is the one place the app forecasts, and the panel left it
-    /// untinted, so the ink appears only where it means something: a forecast
-    /// under three days goes red. Amber a week out would put a warning colour on
-    /// a week of credit, which is most of the time for most accounts.
-    private func paceTint(_ reading: Reading) -> Color {
-        guard let left = reading.daysLeft else { return .secondary }
-        return left < 3 ? Palette.red(scheme) : Color.primary
+    /// The fire is the only mark the pace tile makes, and it is a badge beside the
+    /// figure rather than a colour on it: the rate is an ordinary statistic most
+    /// of the time, and repainting it red made it read as an error. It appears
+    /// when the forecast runs inside the horizon — `paceHorizonDays`, three days
+    /// by default, 0 to switch it off.
+    private func paceBadge(_ reading: Reading) -> String? {
+        guard model.config.paceHorizonDays > 0, let left = reading.daysLeft else { return nil }
+        return left < Double(model.config.paceHorizonDays) ? "🔥" : nil
     }
 }
 

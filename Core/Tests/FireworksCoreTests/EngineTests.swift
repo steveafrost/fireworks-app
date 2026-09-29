@@ -123,13 +123,18 @@ final class TimeTests: XCTestCase {
         }
     }
 
-    func testTheDailyRatePrefersTheCurrentPaceOverTheDilutedAverage() {
-        // 12 hours into the day at $1.00 → $2/day, not the since-anchor average
+    func testTheDailyRateBlendsTodaysPaceWithTheWindowsAverage() {
+        // 12 hours into the day at $1.00 is $2/day; the same $1.00 spent across a
+        // 96-hour window is $0.25/day. One heavy afternoon moves the forecast
+        // without owning it, so the rate is the mean of the two.
         XCTAssertEqual(Time.dailyRate(todaySpend: 1.00, hoursToday: 12, spend: 1.0, hours: 96),
-                       2.0, accuracy: 1e-6)
-        // too little of today to have a pace: fall back to the average
+                       1.125, accuracy: 1e-6)
+        // too little of today to have a pace: the average stands alone
         XCTAssertEqual(Time.dailyRate(todaySpend: 0.10, hoursToday: 0.5, spend: 2.0, hours: 48),
                        1.0, accuracy: 1e-6)
+        // a fresh anchor has no window behind it: the pace stands alone
+        XCTAssertEqual(Time.dailyRate(todaySpend: 0.50, hoursToday: 6, spend: 0, hours: 0),
+                       2.0, accuracy: 1e-6)
     }
 
     func testTheCompactStampStaysShort() {
@@ -173,6 +178,17 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.historyDays, 31)
         XCTAssertEqual(config.refreshSeconds, 30)
         XCTAssertEqual(config.notifyPercent, [70])
+    }
+
+    func testThePaceHorizonSurvivesGarbageAndOff() {
+        var config = FireworksConfig()
+        XCTAssertEqual(config.paceHorizonDays, 3)          // the default the panel uses
+        config.paceHorizonDays = 400
+        config.normalise()
+        XCTAssertEqual(config.paceHorizonDays, 90)
+        config.paceHorizonDays = -5
+        config.normalise()
+        XCTAssertEqual(config.paceHorizonDays, 0)          // 0 is a setting, not a mistake
     }
 
     func testPercentCleaningFallsBackRatherThanDisarmingAlerts() {
@@ -255,6 +271,21 @@ final class AlertTests: XCTestCase {
                 when: Date? = nil) -> AlertMemory {
         AlertMemory(fired: fired, anchorBalance: anchor,
                     anchorTime: when ?? config.anchorTime)
+    }
+
+    func testThePaceBadgeDrawsTheLineAtTheHorizon() {
+        // $6.80 across the 17-hour window is $9.60/day, so $28 of credit is 2.9
+        // days and $30 is 3.1: the horizon is the line the badge sits on, and it
+        // is the only mark the tile makes.
+        let tight = reading(28.0, anchor: 40.0, spend: 6.8)
+        XCTAssertEqual(tight.dailyRate, 9.6, accuracy: 0.01)
+        XCTAssertEqual(tight.daysLeft!, 2.917, accuracy: 0.01)
+        XCTAssertTrue(tight.paceIsTight(horizonDays: 3))
+        XCTAssertFalse(tight.paceIsTight(horizonDays: 2))
+        XCTAssertFalse(tight.paceIsTight(horizonDays: 0))     // 0 turns the mark off
+        XCTAssertFalse(reading(30.0, anchor: 40.0, spend: 6.8).paceIsTight(horizonDays: 3))
+        // nothing spent yet is no rate at all, and no rate is not a tight forecast
+        XCTAssertFalse(reading(30.0, anchor: 40.0, spend: 0).paceIsTight(horizonDays: 3))
     }
 
     func testACrossingWarnsOnce() {

@@ -35,6 +35,9 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
     public var criticalThreshold: Double = 1.00
     /// Days in the daily breakdown, sparkline, chart and the "Last Nd" total.
     public var historyDays: Int = 7
+    /// How close the forecast has to get before the pace tile earns its fire.
+    /// 0 turns the mark off.
+    public var paceHorizonDays: Int = 3
     /// How often the app re-measures, in seconds (widgets get their own budget).
     public var refreshSeconds: Int = 300
     /// Desktop/iOS alerts on threshold crossings.
@@ -51,6 +54,7 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
         case lowThreshold = "low_threshold"
         case criticalThreshold = "critical_threshold"
         case historyDays = "history_days"
+        case paceHorizonDays = "pace_horizon_days"
         case refreshSeconds = "refresh_seconds"
         case notify
         case notifyPercent = "notify_percent"
@@ -71,6 +75,8 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
         criticalThreshold = (try? values.decode(Double.self, forKey: .criticalThreshold))
             ?? defaults.criticalThreshold
         historyDays = (try? values.decode(Int.self, forKey: .historyDays)) ?? defaults.historyDays
+        paceHorizonDays = (try? values.decode(Int.self, forKey: .paceHorizonDays))
+            ?? defaults.paceHorizonDays
         refreshSeconds = (try? values.decode(Int.self, forKey: .refreshSeconds))
             ?? defaults.refreshSeconds
         notify = (try? values.decode(Bool.self, forKey: .notify)) ?? defaults.notify
@@ -85,6 +91,7 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
     /// the app render nonsense (a 400-day history is 400 API requests a refresh).
     public mutating func normalise() {
         historyDays = min(31, max(2, historyDays))
+        paceHorizonDays = min(90, max(0, paceHorizonDays))
         refreshSeconds = min(3600, max(30, refreshSeconds))
         notifyPercent = FireworksConfig.cleanPercents(notifyPercent)
     }

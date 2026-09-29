@@ -257,15 +257,23 @@ public struct Tile: View {
     let title: String
     let value: String
     var note: String? = nil
-    var tint: Color? = nil
+    /// A small glyph after the figure — the fire the pace earns when the forecast
+    /// runs short.
+    ///
+    /// A badge rather than a colour on the number: the figure is the same ink as
+    /// every other figure, so the tile never shouts, and the mark says what it
+    /// means instead of implying the number itself is wrong. (Repainting the pace
+    /// red was the earlier version, and it made an ordinary figure look like an
+    /// error message.)
+    var badge: String? = nil
 
     @Environment(\.colorScheme) private var scheme
 
-    public init(title: String, value: String, note: String? = nil, tint: Color? = nil) {
+    public init(title: String, value: String, note: String? = nil, badge: String? = nil) {
         self.title = title
         self.value = value
         self.note = note
-        self.tint = tint
+        self.badge = badge
     }
 
     public var body: some View {
@@ -273,12 +281,19 @@ public struct Tile: View {
             Text(title)
                 .eyebrow()
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(tint ?? .primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if let badge {
+                    Text(badge)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                }
+            }
             if let note {
                 Text(note)
                     .font(.system(size: 10))

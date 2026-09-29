@@ -107,6 +107,15 @@ public struct Reading: Codable, Sendable, Equatable {
         creditDays(remaining: remaining, perDay: dailyRate)
     }
 
+    /// Whether the forecast has run inside the horizon — the condition the pace
+    /// tile badges. The rule lives here so the popover, the phone and the widget
+    /// cannot disagree about when the mark appears; the glyph belongs to whichever
+    /// view draws it, and `horizonDays` of 0 means the mark is off.
+    public func paceIsTight(horizonDays: Int) -> Bool {
+        guard horizonDays > 0, let left = daysLeft else { return false }
+        return left < Double(horizonDays)
+    }
+
     /// The chosen window in dollars — the figure a prepaid account actually
     /// cares about when there is no quota percentage to watch.
     public var windowTotal: Double {

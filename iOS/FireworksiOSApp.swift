@@ -101,7 +101,8 @@ struct iOSRootView: View {
         HStack(spacing: 10) {
             Tile(title: "Today", value: Money.formatted(reading.today))
             Tile(title: "Pace", value: "\(Money.formatted(reading.dailyRate))/day",
-                 note: reading.daysLeft.map { String(format: "~%.1f days left", $0) })
+                 note: reading.daysLeft.map { String(format: "~%.1f days left", $0) },
+                 badge: reading.paceIsTight(horizonDays: model.config.paceHorizonDays) ? "🔥" : nil)
         }
     }
 

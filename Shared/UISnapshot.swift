@@ -143,6 +143,10 @@ public enum UISnapshot {
             }
             MetricRow(label: "MetricRow", value: "$1.00", note: "note")
             Tile(title: "Tile", value: "$2.00", note: "note")
+            // The badge on its own: the popover only shows the fire when a real
+            // forecast is tight, so a sample at 3.8 days renders without it — and
+            // an unverified glyph is how a glyph ships broken.
+            Tile(title: "Pace with badge", value: "$2.20/day", note: "~2.4 days left", badge: "🔥")
             Text("after the components").font(.system(size: 12))
         }
         .padding(12)
