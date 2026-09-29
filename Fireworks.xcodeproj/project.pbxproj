@@ -14,6 +14,7 @@
 		184A1A90316A15DCAE353B49 /* WidgetModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DE71B3D22A1D73954DB55 /* WidgetModel.swift */; };
 		197DEA9B8137E5A16279BDF3 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D58113215EE7004A68FDA2B /* Diagnostics.swift */; };
 		1A3504B505F2B11B2E173FC2 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCCAF7BB6EBF4EEC7FC0B7F0 /* AppModel.swift */; };
+		240AD2AE01E3F3D24DCA69C3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C93400D446987A312500D678 /* Assets.xcassets */; };
 		2631C5DC8DF2782F744FAD65 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D58113215EE7004A68FDA2B /* Diagnostics.swift */; };
 		27BF78ECD9D56E1FC6CE2FDD /* FireworksWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5EBF73694F0BD0A94AD9818 /* FireworksWidget.swift */; };
 		2CB3E02CFF34A9C451637C94 /* SharedContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32ED1BD01AF55889F2E09034 /* SharedContainer.swift */; };
@@ -23,7 +24,7 @@
 		3EAA3682B8FE444969C415E6 /* FireworksWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAA2FEE8A0377C30D2A2BB61 /* FireworksWidgetView.swift */; };
 		47AEECDDAC934A973CCB1087 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01962E73E55B3E9173D99437 /* OverviewView.swift */; };
 		49D6533791441569B8FD145E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E68C91204674A270C509AFD /* SettingsView.swift */; };
-		58522820F014A540AB54C255 /* UISnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58636D78754DFC667597578C /* UISnapshot.swift */; };
+		55A09090E688E069C6C0904F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C93400D446987A312500D678 /* Assets.xcassets */; };
 		5F2E71BC082836AD786F2E80 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01962E73E55B3E9173D99437 /* OverviewView.swift */; };
 		6694818297C940983C95632D /* FireworksCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA3A86A27F477E496373EC0D /* FireworksCore */; };
 		6DD90732F49EFF80A897E04E /* WidgetModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DE71B3D22A1D73954DB55 /* WidgetModel.swift */; };
@@ -40,10 +41,11 @@
 		8D64BACAE5BD5E9BBF32B4B4 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72AF5FEE0223329B28C2956E /* Components.swift */; };
 		8F3B23CD338FB851F137F005 /* SharedContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32ED1BD01AF55889F2E09034 /* SharedContainer.swift */; };
 		9243829464526B7D3A018591 /* .gitkeep in Resources */ = {isa = PBXBuildFile; fileRef = B9B75A290B19848F395F412F /* .gitkeep */; };
+		9263D9427CD3EDEF7E254793 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F8357EC45E01BA55EAB73B7F /* PrivacyInfo.xcprivacy */; };
 		95CB6EE20674A1D990077EED /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01962E73E55B3E9173D99437 /* OverviewView.swift */; };
 		96614502B025C116390A965B /* UISnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58636D78754DFC667597578C /* UISnapshot.swift */; };
 		A11991F9E609BA7B0581B365 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCCAF7BB6EBF4EEC7FC0B7F0 /* AppModel.swift */; };
-		B2743AA01EF75523F81729C4 /* UISnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58636D78754DFC667597578C /* UISnapshot.swift */; };
+		ADEF77DE347250719E93E9E2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F8357EC45E01BA55EAB73B7F /* PrivacyInfo.xcprivacy */; };
 		BAE86A143D4222D8D7EB307B /* FireworksWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAA2FEE8A0377C30D2A2BB61 /* FireworksWidgetView.swift */; };
 		BFFC0CACE3BA3B40446AF0CE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E68C91204674A270C509AFD /* SettingsView.swift */; };
 		C73941BCB32ABB5C5EC2CAB1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E68C91204674A270C509AFD /* SettingsView.swift */; };
@@ -118,11 +120,13 @@
 		B9B75A290B19848F395F412F /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
 		BA0BA2EC62A607D06344A9C6 /* Fireworks.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fireworks.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BD8626E5708C7E43E2BC8C4D /* FireworksApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireworksApp.swift; sourceTree = "<group>"; };
+		C93400D446987A312500D678 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DCCAF7BB6EBF4EEC7FC0B7F0 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		E00DE71B3D22A1D73954DB55 /* WidgetModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetModel.swift; sourceTree = "<group>"; };
 		F0BBAD9DDF20A1CE1BF75CBC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F0E133BC64A98CD7B65DDF58 /* FireworksiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FireworksiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5EBF73694F0BD0A94AD9818 /* FireworksWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireworksWidget.swift; sourceTree = "<group>"; };
+		F8357EC45E01BA55EAB73B7F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		FBA9401CBDB92AC80C78A768 /* Fireworks.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fireworks.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -194,6 +198,7 @@
 		862F6494F615CFAD8F0AF390 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				8C6F62470797449623100512 /* Assets */,
 				B126E384134AE56623950F95 /* Views */,
 				DCCAF7BB6EBF4EEC7FC0B7F0 /* AppModel.swift */,
 				2D58113215EE7004A68FDA2B /* Diagnostics.swift */,
@@ -213,6 +218,15 @@
 				8004FB46692D106DD2238A76 /* FireworksWidgets.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8C6F62470797449623100512 /* Assets */ = {
+			isa = PBXGroup;
+			children = (
+				C93400D446987A312500D678 /* Assets.xcassets */,
+				F8357EC45E01BA55EAB73B7F /* PrivacyInfo.xcprivacy */,
+			);
+			path = Assets;
 			sourceTree = "<group>";
 		};
 		B126E384134AE56623950F95 /* Views */ = {
@@ -395,6 +409,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				D40657A4EE9FEE6836ED4791 /* .gitkeep in Resources */,
+				240AD2AE01E3F3D24DCA69C3 /* Assets.xcassets in Resources */,
+				9263D9427CD3EDEF7E254793 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -403,6 +419,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				9243829464526B7D3A018591 /* .gitkeep in Resources */,
+				55A09090E688E069C6C0904F /* Assets.xcassets in Resources */,
+				ADEF77DE347250719E93E9E2 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -438,7 +456,6 @@
 				5F2E71BC082836AD786F2E80 /* OverviewView.swift in Sources */,
 				49D6533791441569B8FD145E /* SettingsView.swift in Sources */,
 				8779FA037440E6F9124CCA04 /* SharedContainer.swift in Sources */,
-				58522820F014A540AB54C255 /* UISnapshot.swift in Sources */,
 				184A1A90316A15DCAE353B49 /* WidgetModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -472,7 +489,6 @@
 				CDE226C53B97E3541776FB19 /* OverviewView.swift in Sources */,
 				8244C73526039140739F76ED /* SettingsView.swift in Sources */,
 				2CB3E02CFF34A9C451637C94 /* SharedContainer.swift in Sources */,
-				B2743AA01EF75523F81729C4 /* UISnapshot.swift in Sources */,
 				6DD90732F49EFF80A897E04E /* WidgetModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
