@@ -17,7 +17,8 @@ import AppKit
 ///
 /// Add `--render-ui-sample` to draw a synthetic reading instead of whatever is on
 /// disk, which is how the states a real account only rarely reaches (low,
-/// critical, over-anchor) get looked at.
+/// critical, over-anchor) get looked at. Add `--render-ui-dark` to render every
+/// panel in both appearances.
 ///
 /// Two things this renderer cannot do, both of which have already been mistaken
 /// for app bugs — read them before believing a blank panel:
@@ -42,36 +43,58 @@ public enum UISnapshot {
         CommandLine.arguments.contains("--render-ui-sample")
     }
 
+    /// `--render-ui-dark` renders every panel in the dark palette as well. Both
+    /// appearances have to be looked at — a colour that reads on the lavender
+    /// surface can vanish on Mocha — and the appearance is injected into the
+    /// environment rather than taken from the app, so the render cannot depend
+    /// on which mode the machine happens to be in.
+    private static var wantsDark: Bool {
+        CommandLine.arguments.contains("--render-ui-dark")
+    }
+
     @MainActor
     public static func render(to directory: URL, model: AppModel) {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         if wantsSample {
             model.previewInstallSampleReading()
         }
+        let schemes: [ColorScheme] = wantsDark ? [.light, .dark] : [.light]
         var written: [String] = []
-        for (name, view, size) in panels(model: model) {
-            // The opaque backdrop is load-bearing: `ImageRenderer` composites onto
-            // a transparent canvas, and text drawn straight onto it comes out
-            // blank — text inside a view that has its own fill survives, which is
-            // what made a working popover look like it had lost half its rows.
-            let framed = view
-                .frame(width: size.width, height: size.height, alignment: .top)
-                .background(Palette.surface(.light))
-            let renderer = ImageRenderer(content: AnyView(framed))
-            renderer.scale = 2
-            guard let image = renderer.nsImage,
-                  let data = image.tiffRepresentation,
-                  let bitmap = NSBitmapImageRep(data: data),
-                  let png = bitmap.representation(using: .png, properties: [:]) else {
-                print("FIREWORKS --render-ui: could not render \(name)")
-                continue
-            }
-            let url = directory.appendingPathComponent("\(name).png")
-            do {
-                try png.write(to: url)
-                written.append(url.path)
-            } catch {
-                print("FIREWORKS --render-ui: could not write \(url.path): \(error)")
+        for scheme in schemes {
+            for (name, view, size) in panels(model: model) {
+                // The opaque backdrop is load-bearing: `ImageRenderer` composites onto
+                // a transparent canvas, and text drawn straight onto it comes out
+                // blank — text inside a view that has its own fill survives, which is
+                // what made a working popover look like it had lost half its rows.
+                //
+                // `fixedSize(vertical:)` is the second half of that lesson, learned
+                // the hard way: a frame *taller* than the content lets a VStack
+                // stretch its flexible rows and widen its own gaps, so the spacing in
+                // the image is not the spacing in the popover. Pin the height to the
+                // content's ideal and the render matches the window — which is also
+                // sized to that ideal.
+                let framed = view
+                    .environment(\.colorScheme, scheme)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: size.width, height: size.height, alignment: .top)
+                    .background(Palette.surface(scheme))
+                let renderer = ImageRenderer(content: AnyView(framed))
+                renderer.scale = 2
+                guard let image = renderer.nsImage,
+                      let data = image.tiffRepresentation,
+                      let bitmap = NSBitmapImageRep(data: data),
+                      let png = bitmap.representation(using: .png, properties: [:]) else {
+                    print("FIREWORKS --render-ui: could not render \(name)")
+                    continue
+                }
+                let suffix = scheme == .dark ? "-dark" : ""
+                let url = directory.appendingPathComponent("\(name)\(suffix).png")
+                do {
+                    try png.write(to: url)
+                    written.append(url.path)
+                } catch {
+                    print("FIREWORKS --render-ui: could not write \(url.path): \(error)")
+                }
             }
         }
         for path in written { print("FIREWORKS rendered \(path)") }
@@ -85,8 +108,15 @@ public enum UISnapshot {
         // to nothing, which looks exactly like a layout bug in the app. The real
         // popover is sized by its content, so the snapshot has to allow for it.
         [
-            ("popover", AnyView(OverviewView().environment(model)), CGSize(width: 340, height: 900)),
-            ("popover-empty", AnyView(SetupCard().environment(model)), CGSize(width: 340, height: 430)),
+            ("popover", AnyView(OverviewView().environment(model)), CGSize(width: 340, height: 505)),
+            // The setup screen is what a fresh install sees, so its preview gets
+            // the same shell the popover puts it in — the surface and the inset.
+            // Drawn bare it sat flush against the window edge, and the review was
+            // of the harness rather than of the card.
+            ("popover-empty", AnyView(SetupCard().environment(model)
+                .padding(Rhythm.inset)
+                .frame(width: Rhythm.width, alignment: .leading)),
+             CGSize(width: 340, height: 430)),
             ("settings", AnyView(SettingsView().environment(model)), CGSize(width: 460, height: 760)),
             ("probe", AnyView(probe), CGSize(width: 340, height: 340))
         ]

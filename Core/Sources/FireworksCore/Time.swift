@@ -111,6 +111,16 @@ public enum Time {
         return formatter.string(from: date)
     }
 
+    /// The clock time alone, 24-hour: "15:41". A panel sentence that ends
+    /// "· updated 3:40 PM" is eleven characters wider than the same fact in
+    /// 24-hour time, and that sentence sits on one line by design.
+    public static func clock(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
     /// The rate a forecast uses: the current pace when there is one, otherwise
     /// the since-anchor average (which every idle hour dilutes).
     public static func dailyRate(todaySpend: Double, hoursToday: Double,

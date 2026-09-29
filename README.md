@@ -69,6 +69,10 @@ To look at the UI without screen-recording permission (which this Mac denies):
 /Applications/Fireworks.app/Contents/MacOS/Fireworks --render-ui /tmp/fireworks-ui --render-ui-sample
 ```
 
+Add `--render-ui-dark` to render every panel in both appearances. The renderer
+pins the content to its ideal height and the appearance is injected into the
+environment, so the images match the popover rather than the harness.
+
 ## Distribution
 
 Signed with the Developer ID and notarized, shipped as a DMG and a Homebrew cask.

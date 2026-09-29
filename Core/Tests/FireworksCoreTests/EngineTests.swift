@@ -132,6 +132,14 @@ final class TimeTests: XCTestCase {
                        1.0, accuracy: 1e-6)
     }
 
+    func testTheCompactStampStaysShort() {
+        let stamp = Time.compactStamp(date(2026, 9, 25, 13, 36))
+        XCTAssertTrue(stamp.contains("13:36"), stamp)
+        XCTAssertFalse(stamp.contains("2026"), stamp)   // the year is noise in a subtitle
+        XCTAssertTrue(stamp.count <= 17, stamp)
+        XCTAssertEqual(Time.clock(date(2026, 9, 25, 15, 41)), "15:41")
+    }
+
     func testHumanAgeReadsInTheRightUnit() {
         XCTAssertEqual(Time.humanAge(30), "30s ago")
         XCTAssertEqual(Time.humanAge(600), "10m ago")

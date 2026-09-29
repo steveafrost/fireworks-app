@@ -27,6 +27,7 @@ struct FireworksiOSApp: App {
 
 struct iOSRootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.colorScheme) private var scheme
     @State private var showingSettings = false
 
     var body: some View {
@@ -38,12 +39,24 @@ struct iOSRootView: View {
                                     critical: model.config.criticalThreshold, size: 150)
                             .frame(maxWidth: .infinity)
                         tiles(reading)
-                        metrics(reading)
+                        VStack(alignment: .leading, spacing: 8) {
+                            SectionLabel("History",
+                                         detail: "anchored \(Time.compactStamp(reading.anchorTime))")
+                            MetricTable(metrics(reading))
+                        }
                         if reading.days.count > 1 {
-                            DayBars(days: reading.days, height: 44)
+                            VStack(alignment: .leading, spacing: 8) {
+                                SectionLabel("Daily burn",
+                                             detail: "\(Money.formatted(reading.windowDailyAverage))/day average")
+                                DayChart(days: reading.days, ink: ink(reading))
+                            }
                         }
                         if !reading.models.isEmpty {
-                            ModelMix(reading: reading)
+                            VStack(alignment: .leading, spacing: 8) {
+                                SectionLabel("Model mix",
+                                             detail: "\(Money.formatted(reading.spend)) since anchor")
+                                ModelMix(reading: reading)
+                            }
                         }
                     } else {
                         SetupCard()
@@ -92,13 +105,23 @@ struct iOSRootView: View {
         }
     }
 
-    @ViewBuilder
-    private func metrics(_ reading: Reading) -> some View {
-        VStack(spacing: 6) {
-            MetricRow(label: "Anchor", value: Money.formatted(reading.spend),
-                      note: "\(Int(reading.hours))h")
-            MetricRow(label: "Last \(reading.days.count)d", value: Money.formatted(reading.windowTotal),
-                      note: "\(Money.formatted(reading.windowDailyAverage))/day")
-        }
+    /// The same rows the popover shows, so a number read on the phone means the
+    /// same thing as the same number read in the menu bar.
+    private func metrics(_ reading: Reading) -> [Metric] {
+        [
+            Metric(label: "Yesterday",
+                   note: reading.days.dropLast().last.map { Time.displayLabel($0.date) },
+                   value: Money.formatted(reading.days.dropLast().last?.cost ?? 0)),
+            Metric(label: "Since anchor", note: "\(Int(reading.hours))h",
+                   value: Money.formatted(reading.spend)),
+            Metric(label: "Last \(reading.days.count) days",
+                   note: "\(Money.formatted(reading.windowDailyAverage))/day",
+                   value: Money.formatted(reading.windowTotal))
+        ]
+    }
+
+    private func ink(_ reading: Reading) -> Color {
+        Palette.ink(remaining: reading.remaining, low: model.config.lowThreshold,
+                    critical: model.config.criticalThreshold, scheme: scheme)
     }
 }

@@ -7,7 +7,14 @@ Core/.build/
 DerivedData/
 *.xcuserstate
 xcuserdata/
-*.xcodeproj/          # generated from project.yml by xcodegen — never hand-edited
+# xcodegen writes the project; project.yml is the only authored file here.
+# No inline comment on the pattern line: git treats the entire line as the
+# pattern, so `*.xcodeproj/   # generated` matches nothing and quietly stops
+# ignoring the project directory.
+*.xcodeproj/
+# Xcode 27 writes its module cache *inside* the project directory, where the
+# rule above does not reach it.
+*.xcodeproj/-Xcc/
 !project.yml
 .build-compliance/
 
