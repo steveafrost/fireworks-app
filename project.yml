@@ -18,16 +18,27 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: 4QJ25Y85MX
-    # Local builds are ad-hoc signed: they run on this Mac and keep a stable
-    # bundle id (which notifications and the Keychain both require) without
-    # needing a provisioning profile. Release builds override this with the
-    # Developer ID identity — see RELEASE.md.
-    CODE_SIGN_IDENTITY: "-"
-    CODE_SIGN_STYLE: Manual
     ENABLE_HARDENED_RUNTIME: NO
     DEAD_CODE_STRIPPING: YES
     SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
     GENERATE_INFOPLIST_FILE: NO
+
+  # Two signing modes, because they answer different questions.
+  #
+  #   Debug   — ad-hoc, no entitlements, no provisioning profile. Builds and runs
+  #             on any Mac with no Apple account, which is how the app is being
+  #             developed and how it runs on this machine today. The bundle id is
+  #             still stable, which is all notifications and the Keychain need.
+  #   Release — a real identity carrying the App Group entitlement. That is also
+  #             the only way an extension is registered with the plugin host, so
+  #             release signing is what makes the widget appear at all.
+  configs:
+    Debug:
+      CODE_SIGN_IDENTITY: "-"
+      CODE_SIGN_STYLE: Manual
+    Release:
+      CODE_SIGN_STYLE: Automatic
+      CODE_SIGN_IDENTITY: "Apple Development"
 
 packages:
   FireworksCore:
@@ -56,6 +67,9 @@ targets:
         # A menu-bar app: no Dock icon, no main window, no app switcher entry.
         # `LSUIElement` is set in Info.plist; the popover is the whole UI.
         ENABLE_APP_SANDBOX: NO
+      configs:
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Mac/Fireworks.entitlements
 
   # ------------------------------------------------------ macOS widget plugin
   FireworksWidgets:
@@ -72,8 +86,12 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.whitebox.fireworks.widgets
         PRODUCT_NAME: FireworksWidgets
         INFOPLIST_FILE: Widgets/Mac/Info.plist
-        ENABLE_APP_SANDBOX: NO
+        # Extensions must be sandboxed, which is why they read the App Group.
+        ENABLE_APP_SANDBOX: YES
         SKIP_INSTALL: YES
+      configs:
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Widgets/FireworksWidgets.entitlements
 
   # ------------------------------------------------------------------ iOS app
   FireworksiOS:
@@ -96,6 +114,9 @@ targets:
         INFOPLIST_FILE: iOS/Info.plist
         TARGETED_DEVICE_FAMILY: "1,2"
         ENABLE_APP_SANDBOX: YES
+      configs:
+        Release:
+          CODE_SIGN_ENTITLEMENTS: iOS/Fireworks.entitlements
 
   # ------------------------------------------------------- iOS widget plugin
   FireworksiOSWidgets:
@@ -114,3 +135,6 @@ targets:
         INFOPLIST_FILE: Widgets/iOS/Info.plist
         ENABLE_APP_SANDBOX: YES
         SKIP_INSTALL: YES
+      configs:
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Widgets/FireworksWidgets.entitlements

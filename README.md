@@ -24,9 +24,11 @@ reported.
 | `Core/Sources/FireworksCore/` | API client, config, anchor math, day series, alert planning, key handling |
 | `Core/Tests/FireworksCoreTests/` | 45 tests, no network, no simulator (`swift test`) |
 | `project.yml` | XcodeGen spec for the app + widget targets (the `.xcodeproj` is generated, never committed) |
-| `Mac/` | menu-bar app (no Dock icon) |
+| `Mac/` | menu-bar app (no Dock icon, popover UI) |
 | `iOS/` | iPhone/iPad app |
+| `Shared/` | the app-side half: `AppModel`, notifications, diagnostics, views |
 | `Widgets/` | WidgetKit extensions for both platforms |
+| `RELEASE.md` | signing, App Group, notarization, TestFlight |
 
 One engine, three surfaces. Nothing about "what the number is" is allowed to
 exist twice, which is why the engine has no AppKit/UIKit/SwiftUI import: the Mac
@@ -51,10 +53,15 @@ app, the iOS app and every widget compile the same source.
 # the engine
 cd Core && swift test
 
-# the apps (once the targets land)
+# the Mac app, and run it
 xcodegen generate
-xcodebuild -project Fireworks.xcodeproj -scheme Fireworks -configuration Release build
+xcodebuild -project Fireworks.xcodeproj -scheme Fireworks -configuration Debug \
+  -destination 'platform=macOS' -derivedDataPath build/dd build
+cp -R build/dd/Build/Products/Debug/Fireworks.app /Applications/ && open -a /Applications/Fireworks.app
 ```
+
+Debug builds are ad-hoc signed, so they run on any Mac with no Apple account;
+Release builds carry the App Group entitlements the widget and TestFlight need.
 
 ## Distribution
 
@@ -65,12 +72,17 @@ API); the iOS build is App Store-bound and sandboxed, as iOS requires.
 ## Status
 
 - [x] Engine: client, config, anchor math, day series, alerts, Keychain, snapshots
-- [x] 45 engine tests
-- [ ] Mac menu-bar app target
-- [ ] WidgetKit extensions (macOS + iOS)
-- [ ] iOS app target
-- [ ] Notifications (`UNUserNotificationCenter`)
-- [ ] Signing, notarization, DMG, cask
+- [x] 45 engine tests (`swift test`)
+- [x] Mac menu-bar app (running on a real Mac against the live API)
+- [x] Notifications via `UNUserNotificationCenter`
+- [x] WidgetKit extension written and embedded for macOS and iOS
+- [x] iOS app target written
+- [ ] Widget *visible* — needs release signing, see RELEASE.md
+- [ ] iOS build + TestFlight — needs the Apple account, see RELEASE.md
+- [ ] Notarized DMG + Homebrew cask — needs a Developer ID certificate
+
+Signing, the App Group registration and TestFlight are documented step by step in
+[RELEASE.md](RELEASE.md); each needs the Apple ID, so none of it is automatic.
 
 The SwiftBar plugin lives at
 [steveafrost/fireworks-menubar](https://github.com/steveafrost/fireworks-menubar)

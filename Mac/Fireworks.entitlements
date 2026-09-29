@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The Mac app is deliberately NOT sandboxed: it is a menu-bar utility that
+	     reads a settings file the user may also edit, and it needs no App Store
+	     review. It still declares the App Group, because the widget extension is
+	     sandboxed and can only read the group container. -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.whitebox.fireworks</string>
+	</array>
+</dict>
+</plist>

@@ -103,9 +103,11 @@
 		2D58113215EE7004A68FDA2B /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
 		32ED1BD01AF55889F2E09034 /* SharedContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedContainer.swift; sourceTree = "<group>"; };
 		385D438BC9177E539BC7CE62 /* FireworksiOSWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = FireworksiOSWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		397B4D9D8FF3F87BDCA34A0F /* Fireworks.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fireworks.entitlements; sourceTree = "<group>"; };
 		5D9F9DD276E520266825097E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		72AF5FEE0223329B28C2956E /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		75B889C671CC40313DDA4242 /* FireworksiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireworksiOSApp.swift; sourceTree = "<group>"; };
+		78E03B3A3AAE0C25B9276733 /* FireworksWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FireworksWidgets.entitlements; sourceTree = "<group>"; };
 		8004FB46692D106DD2238A76 /* FireworksWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FireworksWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2009EC794E5977CD003CF18 /* Notifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifier.swift; sourceTree = "<group>"; };
 		AAA2FEE8A0377C30D2A2BB61 /* FireworksWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireworksWidgetView.swift; sourceTree = "<group>"; };
@@ -120,6 +122,7 @@
 		F0BBAD9DDF20A1CE1BF75CBC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F0E133BC64A98CD7B65DDF58 /* FireworksiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FireworksiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5EBF73694F0BD0A94AD9818 /* FireworksWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireworksWidget.swift; sourceTree = "<group>"; };
+		FBA9401CBDB92AC80C78A768 /* Fireworks.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fireworks.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -185,6 +188,7 @@
 		7CD52E8AAF5E16ABF0398E9A /* Mac */ = {
 			isa = PBXGroup;
 			children = (
+				FBA9401CBDB92AC80C78A768 /* Fireworks.entitlements */,
 				BD8626E5708C7E43E2BC8C4D /* FireworksApp.swift */,
 				F0BBAD9DDF20A1CE1BF75CBC /* Info.plist */,
 			);
@@ -197,6 +201,7 @@
 				12E61620DFDC65B437D58423 /* iOS */,
 				28394914CED36485199D9170 /* Mac */,
 				F5EBF73694F0BD0A94AD9818 /* FireworksWidget.swift */,
+				78E03B3A3AAE0C25B9276733 /* FireworksWidgets.entitlements */,
 				AAA2FEE8A0377C30D2A2BB61 /* FireworksWidgetView.swift */,
 				E00DE71B3D22A1D73954DB55 /* WidgetModel.swift */,
 			);
@@ -247,6 +252,7 @@
 		D084BE430C5B2CCA051B5C6F /* iOS */ = {
 			isa = PBXGroup;
 			children = (
+				397B4D9D8FF3F87BDCA34A0F /* Fireworks.entitlements */,
 				75B889C671CC40313DDA4242 /* FireworksiOSApp.swift */,
 				5D9F9DD276E520266825097E /* Info.plist */,
 			);
@@ -364,19 +370,15 @@
 				TargetAttributes = {
 					910CAC9F4BAAF0F229F123C5 = {
 						DevelopmentTeam = 4QJ25Y85MX;
-						ProvisioningStyle = Manual;
 					};
 					C0F13689194FEFEAE1DEE5F4 = {
 						DevelopmentTeam = 4QJ25Y85MX;
-						ProvisioningStyle = Manual;
 					};
 					D5C8FADB322408656B13B0BA = {
 						DevelopmentTeam = 4QJ25Y85MX;
-						ProvisioningStyle = Manual;
 					};
 					EC4217778A1C893ADD4FB60D = {
 						DevelopmentTeam = 4QJ25Y85MX;
-						ProvisioningStyle = Manual;
 					};
 				};
 			};
@@ -554,8 +556,8 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -590,6 +592,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = iOS/Fireworks.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_APP_SANDBOX = YES;
 				INFOPLIST_FILE = iOS/Info.plist;
@@ -698,6 +701,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Mac/Fireworks.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
 				INFOPLIST_FILE = Mac/Info.plist;
@@ -715,7 +719,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_APP_SANDBOX = NO;
+				ENABLE_APP_SANDBOX = YES;
 				INFOPLIST_FILE = Widgets/Mac/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -767,6 +771,7 @@
 		EFE7423FE1E544E0F85E3837 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widgets/FireworksWidgets.entitlements;
 				ENABLE_APP_SANDBOX = YES;
 				INFOPLIST_FILE = Widgets/iOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -785,8 +790,9 @@
 		F96B7BC85EEEF5C6E1CF4A55 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widgets/FireworksWidgets.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_APP_SANDBOX = NO;
+				ENABLE_APP_SANDBOX = YES;
 				INFOPLIST_FILE = Widgets/Mac/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
