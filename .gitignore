@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager / Xcode
+.build/
+Core/.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcodeproj/          # generated from project.yml by xcodegen — never hand-edited
+!project.yml
+.build-compliance/
+
+# Build products
+build/
+dist/
+*.dmg
