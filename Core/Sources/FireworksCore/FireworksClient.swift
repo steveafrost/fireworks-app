@@ -13,6 +13,10 @@ public struct FireworksError: Error, LocalizedError, Sendable {
 
     public let kind: Kind
 
+    public init(kind: Kind) {
+        self.kind = kind
+    }
+
     public var errorDescription: String? {
         switch kind {
         case .http(let code, let detail):

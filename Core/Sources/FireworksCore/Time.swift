@@ -93,6 +93,11 @@ public enum Time {
         return "\(Int((seconds / 3600).rounded()))h ago"
     }
 
+    /// A full timestamp for a tooltip or a settings row: "16 Sep 2026 at 09:14".
+    public static func displayStamp(_ date: Date) -> String {
+        date.formatted(.dateTime.day().month(.abbreviated).year().hour().minute())
+    }
+
     /// The rate a forecast uses: the current pace when there is one, otherwise
     /// the since-anchor average (which every idle hour dilutes).
     public static func dailyRate(todaySpend: Double, hoursToday: Double,
