@@ -158,13 +158,35 @@ An ad-hoc archive cannot carry the entitlement either — Xcode rejects it with
 entitlement. `group.`-prefixed IDs are valid on macOS (Apple Developer Forums,
 Feb 2025), so the identifier itself needs no change.
 
-Registering this Mac as a device (`00006040-001A41141EF8801C`) is the shortest
-route to the rest: with a registered Mac, Xcode's automatic signing creates the
-macOS App IDs, enables the capability and mints the profiles, exactly as it
-already did for the iOS side. The alternative is the same work by hand — App IDs
-with App Groups, then a Developer ID profile for each. The Login Item
-(`SMAppService`) needs the same team-signed footing, so it stays out until one of
-the two is done.
+Registering this Mac as a device (`00006040-001A41141EF8801C`, done 2026-09-30)
+fixed most of it: Xcode now provisions the Mac targets, creates the two macOS App
+IDs and mints `Mac Team Direct Provisioning Profile: com.whitebox.fireworks` and
+`…widgets`. The pipeline then ran end to end — signed archive, Developer ID export
+carrying the App Group on the app *and* the widget, notarized and stapled app,
+signed notarized stapled DMG, rendered cask:
+
+```
+✓ App Group entitlement present
+✓ widget extension carries the App Group too
+  status: Accepted                      (notary service)
+build/Fireworks-1.0.dmg: accepted       (spctl, source=Notarized Developer ID)
+```
+
+**One thing device registration did not do: enable the App Groups capability on
+the macOS App IDs.** Both Mac profiles carry only `application-identifier`,
+`team-identifier` and `keychain-access-groups` — no `application-groups`. The
+entitlement is therefore *unauthorised*, which macOS tolerates in the signature
+and then refuses at runtime: the installed app's
+`containerURL(forSecurityApplicationGroupIdentifier:)` returns nil, so it writes
+to Application Support instead and the widget has nothing to read. The symptom
+reads like an app bug; the cause is a missing capability on the App ID.
+
+So the last step is portal-side: **Identifiers → `com.whitebox.fireworks` (macOS)
+→ Capabilities → App Groups → Configure → `group.com.whitebox.fireworks`**, and
+the same for `com.whitebox.fireworks.widgets`. Then re-run the script: the
+profiles are regenerated with the group authorised, the container resolves, and
+the app writes the snapshot the widget draws. The Login Item (`SMAppService`)
+needs the same team-signed footing.
 
 ## Install the running app
 

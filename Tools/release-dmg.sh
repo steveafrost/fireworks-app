@@ -76,26 +76,48 @@ xcodegen generate >/dev/null
 say "Archiving (Release)"
 mkdir -p build/release-evidence
 rm -rf "$ARCHIVE" "$EXPORT"
-# Sign nothing at archive time. Two separate reasons, both hit for real:
-#   1. Forcing CODE_SIGN_IDENTITY on top of the project's automatic signing is
-#      refused outright ("conflicting provisioning settings").
-#   2. Letting Xcode sign the archive automatically demands a Mac App
-#      *development* provisioning profile, and this team has no registered Mac
-#      devices, so Xcode fails with "Your team has no devices from which to
-#      generate a provisioning profile".
-# The archive is therefore built unsigned and ALL signing happens in the export
-# below, where the Developer ID profile applies. Developer ID profiles are not
-# device-limited, so this route needs no device registration.
-if ! xcodebuild -project Fireworks.xcodeproj -scheme Fireworks -configuration Release \
-  -destination 'generic/platform=macOS' -archivePath "$ARCHIVE" \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ENABLE_HARDENED_RUNTIME=YES \
-  archive > build/release-evidence/archive.log 2>&1; then
-  fail "archive failed:"
-  grep -E "error:" build/release-evidence/archive.log | sort -u | head -10 | sed 's/^/  /'
-  echo "     full log: build/release-evidence/archive.log"
-  exit 1
+# Archive with Xcode's automatic signing when it can: this is the step where
+# Xcode registers the App IDs, enables the App Groups capability and creates the
+# profiles that authorise the entitlement. It needs a Mac *development* profile,
+# which needs a Mac registered in the team — without one Xcode refuses with
+# "Your team has no devices from which to generate a provisioning profile".
+# In that case fall back to an unsigned archive and let the export sign; the App
+# Group check further down still refuses to ship a DMG whose widget cannot read.
+# Xcode's provisioning resolution is flaky on the first attempt after a profile
+# is created: it can fail with a dangling reference to a .provisionprofile it has
+# not written to disk yet ("Build input file cannot be found: …provisionprofile").
+# A second attempt resolves it, so try twice before falling back.
+signed_archive=0
+for attempt in 1 2; do
+  if xcodebuild -project Fireworks.xcodeproj -scheme Fireworks -configuration Release \
+    -destination 'generic/platform=macOS' -archivePath "$ARCHIVE" \
+    ENABLE_HARDENED_RUNTIME=YES \
+    -allowProvisioningUpdates archive > build/release-evidence/archive.log 2>&1; then
+    signed_archive=1
+    break
+  fi
+  [ "$attempt" = 1 ] && echo "     archive attempt 1 failed; retrying once (provisioning resolution)"
+done
+if [ "$signed_archive" = 1 ]; then
+  ok "archived, signed (automatic signing; log: build/release-evidence/archive.log)"
+else
+  grep -q "no devices from which to generate a provisioning profile" \
+    build/release-evidence/archive.log \
+    && echo "     no Mac registered in the team, so no Mac development profile can be made." \
+    || true
+  echo "     archiving unsigned instead — the export must then be authorised by an"
+  echo "     existing Mac profile, or the App Group entitlement is dropped silently."
+  if ! xcodebuild -project Fireworks.xcodeproj -scheme Fireworks -configuration Release \
+    -destination 'generic/platform=macOS' -archivePath "$ARCHIVE" \
+    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ENABLE_HARDENED_RUNTIME=YES \
+    archive > build/release-evidence/archive-unsigned.log 2>&1; then
+    fail "archive failed:"
+    grep -E "error:" build/release-evidence/archive.log | sort -u | head -10 | sed 's/^/  /'
+    echo "     full log: build/release-evidence/archive.log"
+    exit 1
+  fi
+  ok "archived unsigned → $ARCHIVE (signing happens at export)"
 fi
-ok "archived unsigned → $ARCHIVE (signing happens at export)"
 
 say "Exporting with the Developer ID profile"
 if ! xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportPath "$EXPORT" \
@@ -151,10 +173,21 @@ say "Packaging the DMG"
 DMG="$REPO/build/Fireworks-$VERSION.dmg"
 rm -f "$DMG"
 hdiutil create -volname "Fireworks" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
+# Sign the disk image itself. Notarizing alone leaves the DMG unsigned, and
+# `spctl -a -t open --context context:primary-signature` then reports
+# "rejected: source=no usable signature" — a real Gatekeeper verdict on the file
+# people actually download, even when the app inside is notarized and stapled.
+codesign --force --sign "$IDENTITY" --timestamp "$DMG"
 # Staple the deliverable itself, not only the app inside it. Hash after stapling.
 xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
+if ! spctl -a -t open --context context:primary-signature "$DMG" >/dev/null 2>&1; then
+  fail "the DMG does not pass Gatekeeper — refusing to publish it"
+  spctl -a -t open --context context:primary-signature -v "$DMG" 2>&1 | sed 's/^/  /'
+  exit 1
+fi
+ok "DMG signed, notarized, stapled and accepted by Gatekeeper"
 SHA="$(shasum -a 256 "$DMG" | awk '{print $1}')"
 ok "$DMG"
 echo "  sha256 $SHA"

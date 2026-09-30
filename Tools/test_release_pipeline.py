@@ -50,6 +50,21 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('xcrun stapler validate "$DMG"', packaging)
         self.assertLess(packaging.index('xcrun stapler validate'), packaging.index('SHA='))
 
+    def test_the_dmg_itself_is_signed_and_gatekeeper_accepted(self):
+        """Notarizing a DMG leaves the image unsigned, and spctl then rejects the
+        very file people download ("source=no usable signature") even though the
+        app inside is notarized and stapled. Sign the DMG, then gate on spctl.
+        """
+        script = (ROOT / "Tools/release-dmg.sh").read_text()
+        packaging = script.split('say "Packaging the DMG"', 1)[1]
+        self.assertIn('codesign --force --sign "$IDENTITY" --timestamp "$DMG"', packaging)
+        self.assertLess(
+            packaging.index('codesign --force --sign "$IDENTITY"'),
+            packaging.index('notarytool submit "$DMG"'),
+            "the DMG must be signed before it is notarized",
+        )
+        self.assertIn("spctl -a -t open --context context:primary-signature", packaging)
+
     def test_publishable_cask_comes_from_checked_in_template(self):
         path = ROOT / "Tools/fireworks.rb.in"
         self.assertTrue(path.exists(), "a checked-in cask template is required")
