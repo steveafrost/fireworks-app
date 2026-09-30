@@ -68,11 +68,14 @@ public struct SettingsView: View {
             Divider()
             detail
         }
-        // Narrow on purpose: the window was sized to the popover's content, and a
-        // wider frame only stretches each row's label away from its value. The
-        // ideal is what the window opens at; the minimum is what the widest row
-        // (Alerts, with its two text fields) still needs.
-        .frame(minWidth: 560, idealWidth: 600, minHeight: 460)
+        // Fixed width, free height. A grouped `Form` asks for far more width than
+        // anything in it needs — left to negotiate, this window opened at ~950pt,
+        // which is where the white space came from — so the width is stated rather
+        // than requested, and the height stays flexible so a long pane scrolls
+        // instead of clipping.
+        .frame(width: 580)
+        .frame(minHeight: 460)
+        .background(SettingsSizeProbe())
     }
 
     private var sidebar: some View {
@@ -98,6 +101,11 @@ public struct SettingsView: View {
 
     /// A pane is a title, a line saying what it is for, and its sections — the
     /// same grouped list as before, one screenful at a time.
+    ///
+    /// The width is pinned here rather than left to the content, because a grouped
+    /// `Form`'s ideal width is much wider than anything in it needs: left alone it
+    /// asked for the window to open at ~950pt and pushed every row's label away
+    /// from its value.
     private var detail: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
@@ -123,6 +131,7 @@ public struct SettingsView: View {
             }
             .formStyle(.grouped)
         }
+        .frame(minWidth: 380, idealWidth: 430, maxWidth: 620, alignment: .topLeading)
     }
     #endif
 
@@ -485,6 +494,41 @@ extension Bundle {
         return "\(version) (\(build))"
     }
 }
+
+#if os(macOS)
+/// Reports the settings window's measured size to the log.
+///
+/// "Is it narrow enough" is a question about a number, and the number cannot be
+/// read the usual ways here: Screen Recording is denied, so a screenshot comes back
+/// empty, and an accessory app has no menu bar for a script to drive. So the app
+/// says what it measured, and the log is the thing to argue with.
+private struct SettingsSizeProbe: NSViewRepresentable {
+    final class Watcher {
+        var last: CGSize = .zero
+    }
+
+    func makeCoordinator() -> Watcher { Watcher() }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { report(view, context.coordinator) }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { report(view, context.coordinator) }
+    }
+
+    private func report(_ view: NSView, _ watcher: Watcher) {
+        // The view is not in a window yet during `makeNSView`, so this waits a turn.
+        guard let window = view.window else { return }
+        let size = window.frame.size
+        guard size != watcher.last else { return }
+        watcher.last = size
+        Diagnostics.log("settings: window=\(Int(size.width))x\(Int(size.height))")
+    }
+}
+#endif
 
 /// One row of the settings sidebar.
 ///

@@ -48,6 +48,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        if CommandLine.arguments.contains("--open-settings") {
+            // A script cannot open an accessory app's Settings window — there is no
+            // menu bar to click and no AppleScript command for it — so the only way
+            // to measure that window is to have the app open it. WindowSizeProbe
+            // logs what it measures; both selectors are sent because the SwiftUI
+            // one was renamed between macOS releases.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+            }
+        }
         Task { await AppModel.shared.start() }
     }
 
