@@ -71,6 +71,21 @@ the system menu bar and looks native in both appearances.
 | Building | Xcode 27 / Swift 6, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) |
 | Account | any Fireworks account with an API key |
 
+### Download
+
+**[Fireworks-1.0.dmg](https://github.com/steveafrost/fireworks-app/releases/latest)** —
+signed with a Developer ID certificate, notarized by Apple and stapled, so it
+opens with no Gatekeeper warning. Open the disk image, drag Fireworks to
+Applications, and paste an API key on first launch.
+
+The app updates itself: new releases are published here and announced through the
+signed [appcast](https://steveafrost.github.io/fireworks-app/appcast.xml), which
+the app verifies against the Ed25519 public key compiled into it.
+
+> A Homebrew cask is rendered by the release script (`Tools/fireworks.rb.in` →
+> `build/fireworks.rb`, with the DMG's real `sha256`) but is not in a tap yet, so
+> `brew install --cask fireworks` does not work today. Use the disk image.
+
 ### From source
 
 ```bash
@@ -92,10 +107,6 @@ Debug builds are ad-hoc signed, so they run on any Mac with no Apple account.
 Launch it, paste a key from
 [app.fireworks.ai → API keys](https://app.fireworks.ai/settings/users/api-keys),
 and the first reading arrives a moment later.
-
-> **Prebuilt binaries are not published yet** — a notarized DMG and a Homebrew
-> cask are the next release step, and the app already carries the self-update
-> plumbing for them. Until then, build from source; it takes about a minute.
 
 ### Looking at the UI without screen-recording permission
 
@@ -226,9 +237,12 @@ no longer accept. It is backed up outside the repository, and
       from a 1.0 copy against a 1.1 feed, quiet by default
 - [x] Release signing: App Group granted, `.ipa` exported with an Apple
       Distribution certificate
-- [ ] TestFlight upload — needs the App Store Connect record and an upload key
-- [ ] Notarized DMG + Homebrew cask — needs a Developer ID certificate
-- [ ] Widget *drawing on the Mac* — needs a team-signed app and widget with an authorized App Group (the Developer ID route needs no device registration)
+- [x] Notarized DMG published as
+      [v1.0](https://github.com/steveafrost/fireworks-app/releases/tag/v1.0), with
+      an appcast entry whose Ed25519 signature verifies against the app's key
+- [x] Widget *drawing on the Mac* — team-signed app and widget, App Group authorized
+- [ ] TestFlight upload — needs the App Store Connect app record, then an upload
+- [ ] Homebrew cask in a tap — the release script renders the cask file today
 
 [RELEASE.md](RELEASE.md) has the commands, the verified output, and exactly what
 still needs the Apple account.
