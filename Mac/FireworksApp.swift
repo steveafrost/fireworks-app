@@ -136,7 +136,7 @@ struct MenuBarLabel: View {
     let model: AppModel
 
     var body: some View {
-        if let reading = model.reading, model.config.anchorBalance > 0 {
+        if let reading = model.reading, reading.denominator > 0 {
             Image(nsImage: MenuBarDial.image(fraction: reading.share))
                 .renderingMode(.template)
                 .foregroundStyle(.primary)

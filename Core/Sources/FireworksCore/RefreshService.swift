@@ -6,9 +6,13 @@ public protocol CostSource: Sendable {
     func totalSpend(from start: Date, to end: Date) async throws -> CostWindow
     func costs(start: Date, end: Date, groupBy: [String]) async throws -> CostWindow
     /// The account's real balance. A source that cannot answer *throws*: the
-    /// reading then falls back to the anchored estimate rather than inventing a
-    /// figure, which is the whole difference between a balance and a guess.
+    /// reading then shows the last balance it was given, marked stale, rather than
+    /// inventing a figure — which is the whole difference between a balance and a
+    /// guess.
     func balance() async throws -> CreditBalance
+    /// What has been paid into the account. Throws for the same reason `balance`
+    /// does, and the caller keeps the previous ledger rather than a zero.
+    func ledger() async throws -> CreditLedger
 }
 
 extension FireworksClient: CostSource {}
@@ -50,8 +54,8 @@ public actor RefreshService {
             return RefreshOutcome(
                 reading: previous, events: [],
                 error: FireworksError(kind: .setup(
-                    "Tell the app the balance you hold now. Fireworks exposes spending, not "
-                    + "balance, so everything after that anchor is measured spend")),
+                    "Fireworks has not been reached yet, so there is no balance to show "
+                    + "and nothing to measure against")),
                 isStale: previous != nil)
         }
 
@@ -66,13 +70,12 @@ public actor RefreshService {
         // balance is known, so there is nothing to guess at.
         let measurable = now.timeIntervalSince(anchorTime) >= Self.minimumWindow
         let sinceMidnight = Time.todayWindow(now: now).0
-        // The balance is a different host and a different protocol, so it goes
-        // out alongside the spend queries rather than adding itself to the
-        // refresh. A gateway that cannot answer is *not* a failed refresh: the
-        // anchored estimate is still a reading.
-        let balanceTask: Task<CreditBalance?, Never>? = config.liveBalance
-            ? Task { try? await source.balance() }
-            : nil
+        // The balance and the ledger are a different host and a different protocol,
+        // so they go out alongside the spend queries rather than adding themselves to
+        // the refresh. A gateway that cannot answer is *not* a failed refresh: the
+        // last balance it gave is still a reading.
+        let balanceTask = Task { try? await source.balance() }
+        let ledgerTask = Task { try? await source.ledger() }
         do {
             window = measurable
                 ? try await source.totalSpend(from: anchorTime, to: now)
@@ -91,28 +94,33 @@ public actor RefreshService {
                                   isStale: previous != nil)
         }
 
-        var live: CreditBalance?
-        if let balanceTask { live = await balanceTask.value }
+        let live = await balanceTask.value
+        let ledger = await ledgerTask.value
 
         let days = await daySeries(source: source, now: now, todayCost: today.subtotal,
                                    days: config.historyDays, previous: previous?.days ?? [])
 
-        // The gateway's figure wins outright when it exists: it is the credit
-        // that is actually left, not the credit the anchor says should be.
-        let estimate = Money.rounded(remainingAmount(anchorBalance: config.anchorBalance,
-                                                     spend: window.subtotal))
+        // The gateway's figure wins outright when it exists: it is the credit that is
+        // actually left. When it does not, the last figure Fireworks gave is shown and
+        // the reading marks itself stale — the app does not subtract its way to a
+        // number it cannot see.
+        let remembered = Money.rounded(live.map(\.amount) ?? config.anchorBalance)
         var reading = Reading(
-            remaining: Money.rounded(live?.amount ?? estimate),
+            remaining: remembered,
             spend: Money.rounded(window.subtotal),
             today: Money.rounded(today.subtotal),
             models: window.models.mapValues { Money.rounded($0) },
             days: days,
             hours: (now.timeIntervalSince(anchorTime) / 3600),
             hoursToday: (now.timeIntervalSince(Time.todayWindow(now: now).0) / 3600),
-            anchorBalance: config.anchorBalance,
+            anchorBalance: remembered,
             anchorTime: anchorTime,
             fetchedAt: now,
-            liveBalance: live.map { Money.rounded($0.amount) })
+            liveBalance: live.map { Money.rounded($0.amount) },
+            // Carried forward on a failed invoice read: the denominator changes when
+            // the account is topped up, not when the network drops.
+            credited: ledger?.credited ?? previous?.credited,
+            balanceSeenAt: live != nil ? now : (previous?.balanceSeenAt ?? config.anchorTime))
 
         let (events, memory) = Alerts.plan(reading: reading, config: config,
                                            previous: previous?.alerts,

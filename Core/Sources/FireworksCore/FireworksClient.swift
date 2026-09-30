@@ -206,6 +206,47 @@ public actor FireworksClient {
         }
     }
 
+    /// What has been paid into the account, over the same gateway and with the same
+    /// account name as the balance.
+    ///
+    /// Read alongside the balance because the two are one fact split in two: the
+    /// balance says how much is left, the ledger says what it is left *out of*. The
+    /// dial, the percentage and the percent alerts need the second half, and this is
+    /// where it comes from instead of a figure someone had to type in.
+    public func ledger() async throws -> CreditLedger {
+        guard apiKey.unicodeScalars.allSatisfy({ $0.isASCII }),
+              !apiKey.contains(where: { $0.isWhitespace }) else {
+            throw FireworksError(kind: .badKey(
+                "The API key contains a character that cannot be sent in a request — "
+                + "re-copy just the key"))
+        }
+        var request = URLRequest(url: BalanceRPC.invoiceEndpoint)
+        request.httpMethod = "POST"
+        request.httpBody = BalanceRPC.invoiceRequest(account: try await resolvedAccount())
+        for (field, value) in BalanceRPC.requestHeaders(apiKey: apiKey) {
+            request.setValue(value, forHTTPHeaderField: field)
+        }
+        do {
+            let (data, response) = try await session.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if code == 401 || code == 403 {
+                throw FireworksError(kind: .badKey("Fireworks rejected the API key (HTTP \(code))"))
+            }
+            guard (200..<300).contains(code) else {
+                throw FireworksError(kind: .http(code, "POST /gateway.Gateway/ListInvoices"))
+            }
+            guard let ledger = BalanceRPC.decodeInvoices(data) else {
+                throw FireworksError(kind: .transport(
+                    "the invoice call answered, but not with a readable ledger"))
+            }
+            return ledger
+        } catch let error as FireworksError {
+            throw error
+        } catch {
+            throw FireworksError(kind: .transport("\(type(of: error)): \(error.localizedDescription)"))
+        }
+    }
+
     // MARK: - transport
 
     private func get(_ url: URL) async throws -> [String: Any] {

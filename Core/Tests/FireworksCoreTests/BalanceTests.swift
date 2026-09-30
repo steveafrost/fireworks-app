@@ -76,11 +76,12 @@ final class BalanceTests: XCTestCase {
 
     // MARK: - the reading
 
-    private func config(anchor: Double = 20, liveBalance: Bool = true) -> FireworksConfig {
+    /// The config every test starts from: a balance Fireworks has already reported
+    /// once (20.00 at a fixed time), which is what a first run leaves behind.
+    private func config(anchor: Double = 20) -> FireworksConfig {
         var config = FireworksConfig()
         config.anchorBalance = anchor
         config.anchorTime = Date(timeIntervalSince1970: 1_760_000_000)
-        config.liveBalance = liveBalance
         return config
     }
 
@@ -105,28 +106,40 @@ final class BalanceTests: XCTestCase {
         XCTAssertEqual(outcome.reading?.spend ?? 0, 12.25, accuracy: 1e-9)
     }
 
-    func testAGatewayThatCannotBeReachedFallsBackToTheAnchor() async throws {
+    func testAGatewayThatCannotBeReachedShowsTheLastBalanceItGaveStale() async throws {
+        // Not a subtraction any more: the app shows the figure Fireworks last
+        // reported and says when it last saw it, rather than deriving a number it
+        // cannot see. config() carries 20.00 as the remembered balance.
         let outcome = await refresh(config: config(),
                                     source: FakeSource(total: 12.25, today: 1.0,
                                                        liveFailure: FireworksError(
                                                         kind: .transport("no gateway"))))
         let reading = try XCTUnwrap(outcome.reading)
-        XCTAssertEqual(reading.remaining, 7.75, accuracy: 1e-9)
+        XCTAssertEqual(reading.remaining, 20.0, accuracy: 1e-9)
         XCTAssertNil(reading.liveBalance)
         XCTAssertTrue(reading.isEstimated)
-        // An unreachable gateway is not a failed refresh: the estimate stands.
+        XCTAssertEqual(reading.sourceWord, "stale")
+        // An unreachable gateway is not a failed refresh: the remembered figure stands.
         XCTAssertNil(outcome.error)
         XCTAssertFalse(outcome.isStale)
     }
 
-    func testTurningTheLiveBalanceOffNeverCallsTheGateway() async {
+    func testTheLedgerSaysWhatTheBalanceIsOutOf() async throws {
+        // The balance says how much is left; the invoice ledger says what it is left
+        // out of. Both are asked for on every refresh, and every percentage is
+        // measured against the ledger rather than against a figure anyone typed.
         final class Counting: CostSource, @unchecked Sendable {
             var balanceCalls = 0
+            var ledgerCalls = 0
             func totalSpend(from start: Date, to end: Date) async throws -> CostWindow {
                 CostWindow(subtotal: 4.0)
             }
             func costs(start: Date, end: Date, groupBy: [String]) async throws -> CostWindow {
                 CostWindow(subtotal: 0.5)
+            }
+            func ledger() async throws -> CreditLedger {
+                ledgerCalls += 1
+                return CreditLedger(credited: 20.00, paidInvoices: 3)
             }
             func balance() async throws -> CreditBalance {
                 balanceCalls += 1
@@ -134,10 +147,35 @@ final class BalanceTests: XCTestCase {
             }
         }
         let source = Counting()
-        let outcome = await refresh(config: config(liveBalance: false), source: source)
-        XCTAssertEqual(source.balanceCalls, 0)
-        XCTAssertEqual(outcome.reading?.remaining ?? 0, 16.0, accuracy: 1e-9)
-        XCTAssertTrue(outcome.reading?.isEstimated ?? false)
+        let outcome = await refresh(config: config(), source: source)
+        XCTAssertEqual(source.balanceCalls, 1, "the balance is always asked for now")
+        XCTAssertEqual(source.ledgerCalls, 1)
+        let reading = try XCTUnwrap(outcome.reading)
+        XCTAssertEqual(reading.credited ?? 0, 20.00, accuracy: 1e-9)
+        XCTAssertEqual(reading.remaining, 1.0, accuracy: 1e-9)
+        XCTAssertEqual(reading.denominator, 20.00, accuracy: 1e-9)
+        XCTAssertEqual(reading.share, 0.05, accuracy: 1e-9)
+        XCTAssertEqual(reading.spentPercent, 95.0, accuracy: 1e-9)
+        XCTAssertEqual(reading.creditUsed ?? 0, 19.0, accuracy: 1e-9)
+        XCTAssertFalse(reading.isEstimated)
+    }
+
+    func testAFailedLedgerKeepsThePreviousDenominator() async throws {
+        // An outage must not empty the dial: the denominator changes when the account
+        // is topped up, not when the network drops. FakeSource has no ledger, which is
+        // exactly the failed read.
+        let previous = Reading(remaining: 7.75, spend: 1.0, today: 1.0, models: [:], days: [],
+                               hours: 10, hoursToday: 5, anchorBalance: 7.75,
+                               anchorTime: Date(timeIntervalSince1970: 1_760_000_000),
+                               fetchedAt: Date(timeIntervalSince1970: 1_760_400_000),
+                               liveBalance: 7.75, credited: 20.00)
+        let outcome = await refresh(config: config(),
+                                    source: FakeSource(total: 1.0, today: 0.5, live: 7.5),
+                                    previous: previous)
+        let reading = try XCTUnwrap(outcome.reading)
+        XCTAssertEqual(reading.credited ?? 0, 20.00, accuracy: 1e-9)
+        XCTAssertEqual(reading.denominator, 20.00, accuracy: 1e-9)
+        XCTAssertFalse(reading.isEstimated, "the balance read succeeded, so the figure is live")
     }
 
     func testAStoredReadingKeepsWhichFigureItWas() throws {
@@ -166,41 +204,79 @@ final class BalanceTests: XCTestCase {
         XCTAssertEqual(back.remaining, 4.74, accuracy: 1e-9)
     }
 
-    func testTheSettingDefaultsOnAndCanBeTurnedOff() throws {
-        XCTAssertTrue(FireworksConfig().liveBalance)
+    func testAConfigWrittenBeforeTheLedgerStillLoads() throws {
+        // A file written by the version that had a balance toggle carries
+        // live_balance. The key is gone, and an unknown key must not stop the rest of
+        // the file from loading — the plugin's file, and every existing install, has
+        // to keep working.
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let off = try decoder.decode(FireworksConfig.self,
-                                     from: Data(#"{"live_balance": false}"#.utf8))
-        XCTAssertFalse(off.liveBalance)
+        let old = try decoder.decode(FireworksConfig.self, from: Data(
+            #"{"live_balance": false, "anchor_balance": 20, "notify_percent": [50]}"#.utf8))
+        XCTAssertEqual(old.anchorBalance, 20)
+        XCTAssertEqual(old.notifyPercent, [50])
     }
 
-    func testTheBalanceToggleExplainsItselfInBothStates() {
+    func testTheBalanceCopySaysWhereTheFigureComesFrom() {
         // The settings pane is a `Form`, which the offscreen renderer draws as
-        // nothing, so this copy is checked here rather than by looking at it.
-        XCTAssertTrue(FireworksConfig.balanceSourceHint(live: true).contains("gateway"))
-        XCTAssertTrue(FireworksConfig.balanceSourceHint(live: false).contains("anchor"))
-        XCTAssertNotEqual(FireworksConfig.balanceSourceHint(live: true),
-                          FireworksConfig.balanceSourceHint(live: false))
+        // nothing, so this copy is checked here rather than by looking at it. The
+        // wording is the whole answer to "why is there no balance to fill in": both
+        // the figure and the invoices behind it come from Fireworks.
+        let hint = FireworksConfig.balanceSourceHint()
+        XCTAssertTrue(hint.contains("invoices"))
+        XCTAssertTrue(hint.contains("stale"))
     }
 
     func testThePopoverSaysWhichFigureItIsShowing() {
         // The popover cannot be screenshotted on this Mac, so the footnote it
-        // draws is asserted here: the time, and the one word that keeps an
-        // estimate from reading as something Fireworks reported.
+        // draws is asserted here: the time, and the one phrase that keeps a
+        // remembered figure from reading as something Fireworks just reported.
         let measuredAt = Date(timeIntervalSince1970: 1_760_400_000)
-        let anchored = Reading(remaining: 4.74, spend: 1.26, today: 0.42, models: [:],
-                               days: [], hours: 10, hoursToday: 5, anchorBalance: 6,
-                               anchorTime: Date(timeIntervalSince1970: 1_760_000_000),
-                               fetchedAt: measuredAt)
-        XCTAssertTrue(anchored.isEstimated)
-        XCTAssertEqual(anchored.footnote(), "Last updated: \(Time.clock(measuredAt)) · estimate")
+        let seenAt = Date(timeIntervalSince1970: 1_760_300_000)
+        let remembered = Reading(remaining: 4.74, spend: 1.26, today: 0.42, models: [:],
+                                 days: [], hours: 10, hoursToday: 5, anchorBalance: 6,
+                                 anchorTime: Date(timeIntervalSince1970: 1_760_000_000),
+                                 fetchedAt: measuredAt)
+        XCTAssertTrue(remembered.isEstimated)
+        XCTAssertEqual(remembered.sourceWord, "stale")
+        // The balance's own time, not the spend's: a stale balance with fresh spend
+        // is exactly the state this has to name.
+        var stale = remembered
+        stale.balanceSeenAt = seenAt
+        XCTAssertEqual(stale.footnote(), "Balance last seen: \(Time.clock(seenAt))")
 
-        var live = anchored
-        live.liveBalance = anchored.remaining
+        var live = remembered
+        live.liveBalance = remembered.remaining
+        live.balanceSeenAt = measuredAt
         XCTAssertFalse(live.isEstimated)
+        XCTAssertEqual(live.sourceWord, "live")
         XCTAssertEqual(live.footnote(), "Last updated: \(Time.clock(measuredAt))")
-        XCTAssertFalse(live.footnote().contains("estimate"))
+        XCTAssertFalse(live.footnote().contains("seen"))
+    }
+
+    func testTheCreditLineNamesWhatTheBalanceIsOutOf() {
+        let reading = Reading(remaining: 7.09, spend: 1.0, today: 0.5, models: [:], days: [],
+                              hours: 10, hoursToday: 5, anchorBalance: 7.09,
+                              anchorTime: Date(timeIntervalSince1970: 1_760_000_000),
+                              fetchedAt: Date(timeIntervalSince1970: 1_760_400_000),
+                              liveBalance: 7.09, credited: 20.00)
+        XCTAssertEqual(reading.creditLine(), "of $20.00 credited")
+        XCTAssertEqual(reading.creditUsed ?? 0, 12.91, accuracy: 1e-9)
+
+        // No ledger: the figure is what Fireworks last said, and the line says that
+        // rather than claiming a total it was never told.
+        var fallback = reading
+        fallback.credited = nil
+        XCTAssertEqual(fallback.creditLine(), "of $7.09 last seen")
+        XCTAssertNil(fallback.creditUsed)
+        XCTAssertEqual(fallback.denominator, 7.09, accuracy: 1e-9)
+
+        // Neither: nothing to divide by, and the views draw no ring rather than an
+        // empty one.
+        var nothing = fallback
+        nothing.anchorBalance = 0
+        XCTAssertEqual(nothing.share, 0)
+        XCTAssertEqual(nothing.creditLine(), "with no credit history yet")
     }
 
     /// A source that behaves like the API does about a zero-length window: it
@@ -212,6 +288,9 @@ final class BalanceTests: XCTestCase {
                 throw FireworksError(kind: .http(400, "validation failed"))
             }
             return CostWindow(subtotal: 1.0)
+        }
+        func ledger() async throws -> CreditLedger {
+            CreditLedger(credited: 20.00, paidInvoices: 3)
         }
         func costs(start: Date, end: Date, groupBy: [String]) async throws -> CostWindow {
             guard end.timeIntervalSince(start) >= RefreshService.minimumWindow else {

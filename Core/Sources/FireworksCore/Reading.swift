@@ -33,42 +33,79 @@ public struct Reading: Codable, Sendable, Equatable {
     /// Crossing memory for the alerts, carried with the reading so an alert can
     /// never fire twice for the same crossing.
     public var alerts: AlertMemory?
-    /// The balance the gateway reported, when it could be reached. `remaining`
-    /// is this figure verbatim in that case; nil means `remaining` is the
-    /// anchored estimate (`anchor_balance − rated spend since the anchor`).
+    /// The balance the gateway reported, when it could be reached. `remaining` is
+    /// this figure verbatim in that case; nil means `remaining` is the last balance
+    /// the gateway gave, remembered across the outage.
     public var liveBalance: Double?
+    /// What has been paid into the account, when the gateway could be asked. The
+    /// denominator for every percentage in the app: the balance says what is left,
+    /// this says what it is left out of. Carried forward from the last good reading
+    /// when a refresh cannot reach the invoice call, so an outage does not empty the
+    /// dial.
+    public var credited: Double?
+    /// When the *balance* was last read from Fireworks. `fetchedAt` is when the spend
+    /// was measured, which is a different question — a remembered balance with fresh
+    /// spend is exactly the state this names.
+    public var balanceSeenAt: Date?
 
     /// True when `remaining` is the anchored estimate rather than the account's
     /// real balance — the popover says so rather than passing an estimate off as
     /// the truth.
     public var isEstimated: Bool { liveBalance == nil }
 
+    /// The denominator for the percentages: what was paid in, or the last balance
+    /// Fireworks gave when there is no ledger to divide by. 0 means "cannot say",
+    /// which the views draw as no ring rather than as an empty one.
+    public var denominator: Double { credited ?? anchorBalance }
+
     /// Which figure `remaining` is, in the one word the popover has room for.
-    public var sourceWord: String { isEstimated ? "estimate" : "live" }
+    public var sourceWord: String { isEstimated ? "stale" : "live" }
+
+    /// Every dollar spent since the account was topped up: the ledger minus what is
+    /// left. The measured window answers a different question ("spend since
+    /// Thursday"); this one needs no measurement at all.
+    public var creditUsed: Double? {
+        guard let credited else { return nil }
+        return Money.rounded(max(0, credited - remaining))
+    }
 
     /// The line under the credit bar: when the figure was measured.
     ///
-    /// Just the time: the panel is already dense, and "spent since the anchor"
-    /// lives in Settings beside the anchor itself. The one thing that is *not*
-    /// dropped is the exception — when the gateway could not be reached the
-    /// number is an estimate, and a line that says only "Last updated" would
-    /// pass a subtraction off as something Fireworks reported.
+    /// Just the time in the normal case, because the panel is already dense. The one
+    /// thing that is *not* dropped is the exception: when the gateway could not be
+    /// reached the number is the last balance it gave, and a line that said only
+    /// "Last updated" would pass a remembered figure off as one just read.
     ///
-    /// In Core rather than in the view because it is one string with two states,
-    /// and the popover cannot be screenshotted on a Mac without Screen Recording
+    /// In Core rather than in the view because it is one string with two states, and
+    /// the popover cannot be screenshotted on a Mac without Screen Recording
     /// permission — so it is verified by test.
     public func footnote() -> String {
-        let stamp = "Last updated: \(Time.clock(fetchedAt))"
-        return isEstimated ? "\(stamp) · estimate" : stamp
+        guard !isEstimated else {
+            return "Balance last seen: \(Time.clock(balanceSeenAt ?? anchorTime))"
+        }
+        return "Last updated: \(Time.clock(fetchedAt))"
+    }
+
+    /// What the balance is out of, in prose, for the views that show a percentage
+    /// and have to say what it is a percentage of.
+    public func creditLine() -> String {
+        if let credited, credited > 0 {
+            return "of \(Money.formatted(credited)) credited"
+        }
+        if anchorBalance > 0 {
+            return "of \(Money.formatted(anchorBalance)) last seen"
+        }
+        return "with no credit history yet"
     }
 
     public enum CodingKeys: String, CodingKey {
-        case remaining, spend, today, models, days, hours, alerts
+        case remaining, spend, today, models, days, hours, alerts, credited
         case hoursToday = "hours_today"
         case anchorBalance = "anchor_balance"
         case anchorTime = "anchor_time"
         case fetchedAt = "fetched_at"
         case liveBalance = "live_balance"
+        case balanceSeenAt = "balance_seen_at"
         case costUsd = "cost"
     }
 
@@ -88,12 +125,15 @@ public struct Reading: Codable, Sendable, Equatable {
         try values.encode(fetchedAt, forKey: .fetchedAt)
         try values.encodeIfPresent(alerts, forKey: .alerts)
         try values.encodeIfPresent(liveBalance, forKey: .liveBalance)
+        try values.encodeIfPresent(credited, forKey: .credited)
+        try values.encodeIfPresent(balanceSeenAt, forKey: .balanceSeenAt)
     }
 
     public init(remaining: Double, spend: Double, today: Double, models: [String: Double],
                 days: [DayTotal], hours: Double, hoursToday: Double, anchorBalance: Double,
                 anchorTime: Date, fetchedAt: Date, alerts: AlertMemory? = nil,
-                liveBalance: Double? = nil) {
+                liveBalance: Double? = nil, credited: Double? = nil,
+                balanceSeenAt: Date? = nil) {
         self.remaining = remaining
         self.spend = spend
         self.today = today
@@ -106,6 +146,8 @@ public struct Reading: Codable, Sendable, Equatable {
         self.fetchedAt = fetchedAt
         self.alerts = alerts
         self.liveBalance = liveBalance
+        self.credited = credited
+        self.balanceSeenAt = balanceSeenAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -122,14 +164,23 @@ public struct Reading: Codable, Sendable, Equatable {
         fetchedAt = (try? values.decode(Date.self, forKey: .fetchedAt)) ?? .distantPast
         alerts = try? values.decodeIfPresent(AlertMemory.self, forKey: .alerts)
         liveBalance = try? values.decodeIfPresent(Double.self, forKey: .liveBalance)
+        credited = try? values.decodeIfPresent(Double.self, forKey: .credited)
+        balanceSeenAt = try? values.decodeIfPresent(Date.self, forKey: .balanceSeenAt)
     }
 
+    /// The fraction of the credit that is left — the dial's arc.
+    ///
+    /// Out of what was paid *in*, not out of a figure someone typed: `credited` is
+    /// the sum of the paid invoices. It falls back to the last balance Fireworks
+    /// gave only when there is no ledger at all (a reading saved before the ledger
+    /// existed), and 0 means "cannot say", which the views draw as no ring rather
+    /// than as an empty one.
     public var share: Double {
-        anchorBalance > 0 ? max(0, min(1, remaining / anchorBalance)) : 0
+        denominator > 0 ? max(0, min(1, remaining / denominator)) : 0
     }
 
     public var spentPercent: Double {
-        spentShare(anchorBalance: anchorBalance, remaining: remaining)
+        spentShare(anchorBalance: denominator, remaining: remaining)
     }
 
     public var dailyRate: Double {
@@ -230,6 +281,22 @@ public enum ReadingStore {
         public var fetchedAt: Date
         public var days: [DayTotal]
         public var account: String
+        /// What was paid in, so a widget can say what the balance is out of.
+        public var credited: Double?
+
+        /// The figure the percentage is out of: the credited total, or the last
+        /// balance when there is no ledger. 0 means the widget has nothing to draw a
+        /// fraction from.
+        public var denominator: Double { credited ?? anchorBalance }
+
+        /// The fraction of the credit still there, 0–1 — what a bar or a ring draws.
+        ///
+        /// Here rather than in the view because `spendPercent` is 0–100 and a view
+        /// has no way to tell by looking: the widget multiplied it by 100 and drew a
+        /// progress bar of `1 − 75`. One figure with one meaning, computed once.
+        public var share: Double {
+            denominator > 0 ? max(0, min(1, remaining / denominator)) : 0
+        }
 
         public init(reading: Reading, account: String = "") {
             remaining = reading.remaining
@@ -241,6 +308,7 @@ public enum ReadingStore {
             fetchedAt = reading.fetchedAt
             days = reading.days
             self.account = account
+            credited = reading.credited
         }
     }
 

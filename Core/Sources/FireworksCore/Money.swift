@@ -33,16 +33,7 @@ public enum Money {
     }
 }
 
-/// `anchor_balance − rated spend since anchor_time → now`.
-///
-/// Fireworks publishes no balance endpoint, so this subtraction is the only
-/// honest way to show a remaining *amount*. A negative result is information
-/// (the anchor is stale, or a top-up went unrecorded), not an error to clamp.
-public func remainingAmount(anchorBalance: Double, spend: Double) -> Double {
-    anchorBalance - spend
-}
-
-/// How much of the anchor has been burned, 0–100 (0 when there is none).
+/// How much of the credit has been burned, 0–100 (0 when there is none).
 public func spentShare(anchorBalance: Double, remaining: Double) -> Double {
     guard anchorBalance > 0 else { return 0 }
     return max(0, min(100, (1 - remaining / anchorBalance) * 100))

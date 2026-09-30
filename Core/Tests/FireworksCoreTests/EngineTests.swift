@@ -34,6 +34,9 @@ struct FakeSource: CostSource {
     /// existed is still testing the anchored fallback.
     var live: Double?
     var liveFailure: FireworksError?
+    /// What the invoice ledger answers. Nil by default, like `live`: a source with
+    /// no ledger, which is the state the denominator has to fall back from.
+    var credited: Double?
 
     func balance() async throws -> CreditBalance {
         if let liveFailure { throw liveFailure }
@@ -41,6 +44,13 @@ struct FakeSource: CostSource {
             throw FireworksError(kind: .transport("gateway unreachable"))
         }
         return CreditBalance(amount: live, currency: "USD", fetchedAt: Date())
+    }
+
+    func ledger() async throws -> CreditLedger {
+        guard let credited else {
+            throw FireworksError(kind: .transport("no ledger"))
+        }
+        return CreditLedger(credited: credited, paidInvoices: 1)
     }
 
     func costs(start: Date, end: Date, groupBy: [String]) async throws -> CostWindow {
@@ -82,10 +92,17 @@ final class MoneyTests: XCTestCase {
         XCTAssertEqual(Money.formatted(0), "$0.00")
     }
 
-    func testRemainingIsAnchorMinusSpend() {
-        XCTAssertEqual(remainingAmount(anchorBalance: 6.00, spend: 1.2587), 4.7413, accuracy: 1e-6)
-        // an overspent anchor is information, not an error to hide
-        XCTAssertEqual(remainingAmount(anchorBalance: 1.00, spend: 1.50), -0.50, accuracy: 1e-6)
+    func testRemainingComesFromTheBalanceNotASubtraction() async {
+        // Fireworks reports the balance, so the app shows that figure rather than
+        // deriving one. This is the rule that used to be `anchor − spend`.
+        let config = FireworksConfig()
+        var anchored = config
+        anchored.anchorBalance = 6.00
+        anchored.anchorTime = Date(timeIntervalSince1970: 1_760_000_000)
+        let source = FakeSource(live: 4.7413)
+        let outcome = await RefreshService().refresh(config: anchored, previous: nil, source: source)
+        XCTAssertEqual(outcome.reading?.remaining ?? 0, 4.7413, accuracy: 1e-6)
+        XCTAssertEqual(outcome.reading?.liveBalance ?? 0, 4.7413, accuracy: 1e-6)
     }
 
     func testSpentShareClampsAndNeedsAnAnchor() {
@@ -401,7 +418,7 @@ final class AlertTests: XCTestCase {
     }
 
     func testTheArmedSummaryIsWhatTheUserSeesInSettings() {
-        XCTAssertEqual(Alerts.armedSummary(config: config), "Alerts on · 70,90% of the anchor")
+        XCTAssertEqual(Alerts.armedSummary(config: config), "Alerts on · 70,90% of your credit")
         config.notify = false
         XCTAssertEqual(Alerts.armedSummary(config: config), "Alerts off")
     }

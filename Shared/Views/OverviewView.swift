@@ -97,7 +97,7 @@ public struct OverviewView: View {
                     .foregroundStyle(ink(reading))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text("of \(Money.formatted(reading.anchorBalance)) left")
+                Text(reading.creditLine())
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

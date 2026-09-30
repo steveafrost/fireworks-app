@@ -16,7 +16,7 @@ public struct FireworksWidgetView: View {
 
     public var body: some View {
         Group {
-            if let snapshot = entry.snapshot, snapshot.anchorBalance > 0 {
+            if let snapshot = entry.snapshot, snapshot.denominator > 0 {
                 content(snapshot)
             } else {
                 unconfigured
@@ -44,14 +44,14 @@ public struct FireworksWidgetView: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if family != .systemSmall {
-                    Text("\(Int((snapshot.spendPercent * 100).rounded()))%")
+                    Text("\(Int(snapshot.spendPercent.rounded()))%")
                         .font(.system(size: 12, weight: .medium))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
             }
 
-            ProgressView(value: max(0, min(1, 1 - snapshot.spendPercent)))
+            ProgressView(value: snapshot.share)
                 .progressViewStyle(.linear)
                 .tint(ink)
 

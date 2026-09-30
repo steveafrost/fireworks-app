@@ -22,12 +22,18 @@ final class RefreshServiceTests: XCTestCase {
     }
 
     func testBuildsTheReadingFromRatedSpend() async {
+        // This fake has no gateway, so the figure shown is the remembered balance and
+        // the reading says it is stale — while the *spend* is still the rated cost of
+        // the window, measured as before.
         let outcome = await refresh(source: FakeSource(total: 1.2587, today: 0.42))
         let reading = try! XCTUnwrap(outcome.reading)
-        XCTAssertEqual(reading.remaining, 4.7413, accuracy: 1e-6)
+        XCTAssertEqual(reading.remaining, 6.0, accuracy: 1e-6)
+        XCTAssertTrue(reading.isEstimated)
         XCTAssertEqual(reading.spend, 1.2587, accuracy: 1e-6)
         XCTAssertEqual(reading.today, 0.42, accuracy: 1e-6)
         XCTAssertEqual(reading.anchorBalance, 6.0)
+        XCTAssertNil(reading.credited)
+        XCTAssertEqual(reading.denominator, 6.0, "no ledger, so the remembered balance")
         XCTAssertEqual(reading.models.count, 2)
         XCTAssertNil(outcome.error)
         XCTAssertFalse(outcome.isStale)
@@ -50,7 +56,7 @@ final class RefreshServiceTests: XCTestCase {
         let outcome = await refresh(source: FakeSource())
         XCTAssertNil(outcome.reading)
         XCTAssertTrue(outcome.error?.isSetup == true)
-        XCTAssertTrue(outcome.error!.errorDescription!.contains("balance you hold"))
+        XCTAssertTrue(outcome.error!.errorDescription!.contains("not been reached"))
     }
 
     func testAFailedRefreshKeepsTheLastGoodReadingAndSaysItIsStale() async {
@@ -84,6 +90,9 @@ final class RefreshServiceTests: XCTestCase {
             func totalSpend(from start: Date, to end: Date) async throws -> CostWindow {
                 CostWindow(subtotal: 1.26)
             }
+            func ledger() async throws -> CreditLedger {
+                CreditLedger(credited: 20.00, paidInvoices: 3)
+            }
             func costs(start: Date, end: Date, groupBy: [String]) async throws -> CostWindow {
                 if end == today { return CostWindow(subtotal: 0.42) }
                 if end.timeIntervalSince(start) > 26 * 3600 { return CostWindow(subtotal: 1.26) }
@@ -101,45 +110,75 @@ final class RefreshServiceTests: XCTestCase {
     }
 
     func testAlertsArePlannedAgainstThePreviousCrossings() async {
-        // a prior reading that had warned about nothing yet, so the 70% crossing
-        // in the new one is genuinely new — a first run seeds silently by design
-        let prior = Reading(remaining: 5.50, spend: 0.50, today: 0, models: [:], days: [],
-                            hours: 12, hoursToday: 6, anchorBalance: 6.0,
+        // A prior reading that had warned about nothing yet, so the 75% crossing in
+        // the new one is genuinely new — a first run seeds silently by design. Both
+        // are measured against the same ledger, so nothing is re-armed in between.
+        let prior = Reading(remaining: 6.00, spend: 0.50, today: 0, models: [:], days: [],
+                            hours: 12, hoursToday: 6, anchorBalance: 6.00,
                             anchorTime: config.anchorTime!,
                             fetchedAt: now.addingTimeInterval(-300),
-                            alerts: AlertMemory(fired: [:], anchorBalance: 6.0,
-                                                anchorTime: config.anchorTime))
-        let outcome = await refresh(source: FakeSource(total: 4.50, today: 0.42), previous: prior)
+                            alerts: AlertMemory(fired: [:], denominator: 20.00,
+                                                anchorTime: config.anchorTime),
+                            liveBalance: 6.00, credited: 20.00)
+        let source = FakeSource(total: 4.50, today: 0.42, live: 5.00, credited: 20.00)
+        let outcome = await refresh(source: source, previous: prior)
         XCTAssertEqual(outcome.events.map(\.kind), [.spend])
         XCTAssertEqual(outcome.events.first?.message.contains("70%"), true)
+        XCTAssertEqual(outcome.events.first?.subtitle.contains("$15.00 spent of the $20.00 credited"),
+                       true)
         XCTAssertEqual(outcome.reading?.alerts?.fired, ["pct:70": 1])
 
         // one that already said so stays quiet and keeps the memory
         let said = try! XCTUnwrap(outcome.reading)
-        let second = await refresh(source: FakeSource(total: 4.50, today: 0.42), previous: said)
+        let second = await refresh(source: source, previous: said)
         XCTAssertTrue(second.events.isEmpty)
         XCTAssertEqual(second.reading?.alerts?.fired, ["pct:70": 1])
     }
 
-    func testAlertsOffProducesNoEventsButStillRemembers() async {
-        config.notify = false
-        let prior = Reading(remaining: 5.50, spend: 0.50, today: 0, models: [:], days: [],
-                            hours: 12, hoursToday: 6, anchorBalance: 6.0,
+    func testATopUpRearmsTheWindowsAndSaysSo() async {
+        // Credit added is a real event: the percentages are measured against the
+        // ledger, so a bigger ledger re-arms every threshold — and saying so is the
+        // difference between "why did it warn again" and "I topped up".
+        let prior = Reading(remaining: 5.00, spend: 0.50, today: 0, models: [:], days: [],
+                            hours: 12, hoursToday: 6, anchorBalance: 5.00,
                             anchorTime: config.anchorTime!,
                             fetchedAt: now.addingTimeInterval(-300),
-                            alerts: AlertMemory(fired: [:], anchorBalance: 6.0,
-                                                anchorTime: config.anchorTime))
-        let outcome = await refresh(source: FakeSource(total: 4.50, today: 0.42), previous: prior)
+                            alerts: AlertMemory(fired: ["pct:70": 1], denominator: 20.00,
+                                                anchorTime: config.anchorTime),
+                            liveBalance: 5.00, credited: 20.00)
+        let outcome = await refresh(source: FakeSource(total: 0.50, today: 0.42, live: 25.00,
+                                                       credited: 40.00),
+                                    previous: prior)
+        XCTAssertEqual(outcome.events.map(\.kind), [.refill])
+        XCTAssertEqual(outcome.events.first?.message.contains("$40.00"), true)
+        XCTAssertEqual(outcome.reading?.alerts?.fired, [:], "the windows are re-armed")
+    }
+
+    func testAlertsOffProducesNoEventsButStillRemembers() async {
+        config.notify = false
+        let prior = Reading(remaining: 6.00, spend: 0.50, today: 0, models: [:], days: [],
+                            hours: 12, hoursToday: 6, anchorBalance: 6.00,
+                            anchorTime: config.anchorTime!,
+                            fetchedAt: now.addingTimeInterval(-300),
+                            alerts: AlertMemory(fired: [:], denominator: 20.00,
+                                                anchorTime: config.anchorTime),
+                            liveBalance: 6.00, credited: 20.00)
+        let outcome = await refresh(source: FakeSource(total: 4.50, today: 0.42, live: 5.00,
+                                                       credited: 20.00),
+                                    previous: prior)
         XCTAssertTrue(outcome.events.isEmpty)
         XCTAssertEqual(outcome.reading?.alerts?.fired, ["pct:70": 1])
     }
 
     func testTheWidgetSnapshotCarriesWhatAWidgetShows() async {
-        let outcome = await refresh(source: FakeSource(total: 1.2587, today: 0.42))
+        let outcome = await refresh(source: FakeSource(total: 1.2587, today: 0.42, live: 4.7413,
+                                                       credited: 20.00))
         let reading = try! XCTUnwrap(outcome.reading)
         let snapshot = ReadingStore.Snapshot(reading: reading, account: "f12057")
         XCTAssertEqual(snapshot.remaining, 4.7413, accuracy: 1e-6)
+        XCTAssertEqual(snapshot.credited ?? 0, 20.00, accuracy: 1e-9)
         XCTAssertEqual(snapshot.spendPercent, reading.spentPercent, accuracy: 1e-9)
+        XCTAssertEqual(snapshot.spendPercent, 76.2935, accuracy: 1e-3)
         XCTAssertEqual(snapshot.days.count, 3)
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(UUID().uuidString)

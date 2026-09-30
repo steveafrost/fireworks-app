@@ -94,16 +94,14 @@ public final class AppModel {
     // MARK: - measuring
 
     public func refresh() async {
-        // The anchor exists only because the REST API cannot report a balance.
-        // It can now be looked up, so a fresh install fills it in rather than
-        // stopping to ask for a number the gateway will hand over.
-        if !config.isAnchored, let adopted = await adoptLiveAnchor() {
-            Diagnostics.log("refresh: anchor auto-set to \(Money.formatted(adopted)) "
-                            + "from the live balance")
+        // The balance comes from Fireworks now, so a fresh install fills it in rather
+        // than stopping to ask for a number the gateway will hand over.
+        if !config.isAnchored, let adopted = await rememberLiveBalance() {
+            Diagnostics.log("refresh: remembered the live balance \(Money.formatted(adopted))")
         }
         guard config.isAnchored else {
             status = .needsAnchor
-            Diagnostics.log("refresh: skipped — no anchor yet (balance=\(config.anchorBalance))")
+            Diagnostics.log("refresh: skipped — no balance has been read yet")
             return
         }
         let key: String
@@ -135,6 +133,14 @@ public final class AppModel {
                                   to: SharedContainer.directory)
                 // The widget renders a file, so a new file *is* the update.
                 WidgetCenter.shared.reloadAllTimelines()
+                // Remember what Fireworks last said, so a later outage has a figure to
+                // show instead of a blank. Written only when it changes: this is the
+                // fallback, not a setting.
+                if let live = fresh.liveBalance, live != config.anchorBalance {
+                    config.anchorBalance = live
+                    config.anchorTime = config.anchorTime ?? fresh.balanceSeenAt ?? Date()
+                    try? ConfigStore.save(config, to: SharedContainer.directory)
+                }
             }
             if let failure = outcome.error {
                 lastError = failure.errorDescription
@@ -147,7 +153,8 @@ public final class AppModel {
                 Diagnostics.log("refresh: ok remaining=\(Money.formatted(reading?.remaining ?? 0)) "
                                 + "spend=\(Money.formatted(reading?.spend ?? 0)) "
                                 + "today=\(Money.formatted(reading?.today ?? 0)) "
-                                + "balance=\(reading?.isEstimated == false ? "live" : "anchor") "
+                                + "balance=\(reading?.sourceWord ?? "—") "
+                                + "credited=\(reading?.credited.map { Money.formatted($0) } ?? "—") "
                                 + "account=\(resolved) events=\(outcome.events.count)")
                 await notifier.deliver(outcome.events, enabled: config.notify)
             }
@@ -165,7 +172,7 @@ public final class AppModel {
         guard let reading else {
             switch status {
             case .needsKey(let reason): return reason
-            case .needsAnchor: return "Set the balance you hold to start measuring"
+            case .needsAnchor: return "Waiting for the first balance from Fireworks"
             default: return "No reading yet"
             }
         }
@@ -199,14 +206,14 @@ public final class AppModel {
         return try KeyStore.read(service: nil, directory: SharedContainer.directory)
     }
 
-    /// First run: take the balance the gateway reports as the anchor.
+    /// First run: take the balance Fireworks reports and remember it.
     ///
-    /// The anchor exists only because the REST API cannot report a balance, so
-    /// the app used to stop and ask for a number it can now look up. This only
-    /// fills the gap — an anchor the user set is never overwritten — so a fresh
-    /// install measures something immediately instead of waiting to be taught.
-    private func adoptLiveAnchor() async -> Double? {
-        guard config.liveBalance, !config.isAnchored else { return nil }
+    /// The figure is the gateway's, not the user's, so there is nothing to fill in.
+    /// This only fills the gap — a balance already remembered is never overwritten
+    /// here — so a fresh install measures something immediately and has a fallback
+    /// ready if the gateway later goes quiet.
+    private func rememberLiveBalance() async -> Double? {
+        guard !config.isAnchored else { return nil }
         guard let found = try? resolveKey() else { return nil }
         keySource = found.source
         let client = FireworksClient(apiKey: found.key, account: config.account)

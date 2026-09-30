@@ -13,6 +13,36 @@ public struct CreditBalance: Sendable, Equatable {
     }
 }
 
+/// What has been paid *into* the account, from the invoices the gateway lists.
+///
+/// This is the denominator the app used to ask a human for. The balance alone says
+/// how much is left but not out of what — a ring, a percentage and a "warn at 70%"
+/// all need to know the size of the thing being spent. `ListInvoices` returns the
+/// prepaid top-ups that were actually paid ($5 + $5 + $10 for this account), so
+/// "how much of what I bought is left" needs no hand-entered anchor and cannot
+/// drift the way one does: a top-up raises the denominator by itself.
+public struct CreditLedger: Codable, Sendable, Equatable {
+    /// The sum of the paid invoices.
+    public let credited: Double
+    /// How many paid invoices that sum came from, so a surprising total can be
+    /// traced back to the invoices it was added up from.
+    public let paidInvoices: Int
+    public let firstPaid: Date?
+    public let lastPaid: Date?
+    public let currency: String
+    public let fetchedAt: Date
+
+    public init(credited: Double, paidInvoices: Int, firstPaid: Date? = nil, lastPaid: Date? = nil,
+                currency: String = "USD", fetchedAt: Date = Date()) {
+        self.credited = credited
+        self.paidInvoices = paidInvoices
+        self.firstPaid = firstPaid
+        self.lastPaid = lastPaid
+        self.currency = currency
+        self.fetchedAt = fetchedAt
+    }
+}
+
 /// Reads the account balance off the control-plane gateway the vendor's CLI uses.
 ///
 /// There is no REST route for it. `GET /v1/accounts/{id}/balance` answers 404,
@@ -28,6 +58,12 @@ public struct CreditBalance: Sendable, Equatable {
 /// speaks — and the message is two fields wide.
 public enum BalanceRPC {
     public static let endpoint = URL(string: "https://gateway.fireworks.ai/gateway.Gateway/GetBalance")!
+    public static let invoiceEndpoint = URL(string: "https://gateway.fireworks.ai/gateway.Gateway/ListInvoices")!
+
+    /// The invoice state that means the money actually arrived. The account's only
+    /// other invoice is state 1 with a zero amount on it — an open invoice, which is
+    /// not money in, and counting it would inflate the denominator the dial uses.
+    static let paidInvoiceState: UInt64 = 2
 
     public static func requestHeaders(apiKey: String) -> [String: String] {
         [
@@ -49,10 +85,59 @@ public enum BalanceRPC {
     public static func decode(_ data: Data) -> (amount: Double, currency: String)? {
         guard let message = unframed(data),
               let money = Proto.message(named: 1, in: message),
-              let units = Proto.varint(named: 2, in: money) else { return nil }
+              let value = amount(in: money) else { return nil }
+        return (value, Proto.string(named: 1, in: money) ?? "USD")
+    }
+
+    /// `ListInvoicesRequest{ name: "accounts/<id>" }` — the same message shape as
+    /// the balance call, and the same frame.
+    public static func invoiceRequest(account: String) -> Data {
+        Data(framed(protobufString(field: 1, value: "accounts/\(account)")))
+    }
+
+    /// `ListInvoicesResponse{ invoices: repeated Invoice }`.
+    ///
+    /// The invoice fields, read off the gateway rather than assumed: 1 = id,
+    /// 2 = Money (the same two-field shape the balance uses), 5 = `{1: seconds}`
+    /// issued, 6 = `{1: seconds}` paid, 7 = state. Checked against
+    /// `firectl billing list-invoices`, which reports the same three PAID
+    /// PREPAID_CREDITS invoices this adds up to $20.00.
+    ///
+    /// Nil only when the reply is not a frame at all. An account that has never
+    /// topped up genuinely has no paid invoices, and that has to arrive as a ledger
+    /// of zero rather than as a failure: "nothing bought yet" and "could not ask"
+    /// mean different things to the dial.
+    public static func decodeInvoices(_ data: Data) -> CreditLedger? {
+        guard let message = unframed(data) else { return nil }
+        var credited = 0.0
+        var paid = 0
+        var dates: [Date] = []
+        var currency = "USD"
+        for invoice in Proto.all(named: 1, in: message) {
+            guard Proto.varint(named: 7, in: invoice) == paidInvoiceState,
+                  let money = Proto.message(named: 2, in: invoice),
+                  let value = amount(in: money), value > 0 else { continue }
+            credited += value
+            paid += 1
+            currency = Proto.string(named: 1, in: money) ?? currency
+            // Paid when the gateway says so, issued otherwise: one date for every
+            // invoice counted, so the range covers exactly what was added up.
+            let seconds = Proto.message(named: 6, in: invoice).flatMap { Proto.varint(named: 1, in: $0) }
+                ?? Proto.message(named: 5, in: invoice).flatMap { Proto.varint(named: 1, in: $0) }
+            if let seconds {
+                dates.append(Date(timeIntervalSince1970: TimeInterval(seconds)))
+            }
+        }
+        return CreditLedger(credited: credited, paidInvoices: paid,
+                            firstPaid: dates.min(), lastPaid: dates.max(), currency: currency)
+    }
+
+    /// A `Money` message as a number: units plus nanos. One arithmetic path for
+    /// money, because the balance and an invoice amount are the same type.
+    static func amount(in money: [UInt8]) -> Double? {
+        guard let units = Proto.varint(named: 2, in: money) else { return nil }
         let nanos = Proto.varint(named: 3, in: money).map { Int64(bitPattern: $0) } ?? 0
-        return (Double(Int64(bitPattern: units)) + Double(nanos) / 1_000_000_000,
-                Proto.string(named: 1, in: money) ?? "USD")
+        return Double(Int64(bitPattern: units)) + Double(nanos) / 1_000_000_000
     }
 
     // MARK: - framing
@@ -71,7 +156,10 @@ public enum BalanceRPC {
         guard bytes.count >= 5, bytes[0] == 0x00 else { return nil }
         let length = Int(bytes[1]) << 24 | Int(bytes[2]) << 16
             | Int(bytes[3]) << 8 | Int(bytes[4])
-        guard length > 0, bytes.count >= 5 + length else { return nil }
+        // `length` of 0 is a legitimate protobuf message with no fields set — the
+        // server answering "there is nothing here" — so only a frame that cannot
+        // hold what it claims to hold is rejected.
+        guard bytes.count >= 5 + length else { return nil }
         return Array(bytes[5..<(5 + length)])
     }
 
@@ -146,6 +234,12 @@ enum Proto {
 
     static func message(named: Int, in message: [UInt8]) -> [UInt8]? {
         walk(message).first { $0.number == named && $0.wire == 2 }?.bytes
+    }
+
+    /// Every length-delimited field with this number, in the order they arrived —
+    /// which is how protobuf carries a repeated message.
+    static func all(named: Int, in message: [UInt8]) -> [[UInt8]] {
+        walk(message).filter { $0.number == named && $0.wire == 2 }.map(\.bytes)
     }
 
     private static func read(_ bytes: [UInt8], from start: Int) -> (UInt64, Int)? {

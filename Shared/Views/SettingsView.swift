@@ -14,11 +14,10 @@ import FireworksCore
 /// shows the figure the app measured, Updates shows a version it has actually
 /// been offered. The rest have nothing true to put there.
 ///
-/// The anchor pane states plainly that setting a balance re-stamps the anchor to
-/// *now*, because the subtraction is only honest if both numbers refer to the
-/// same moment: a top-up that arrives without a new anchor makes the remaining
-/// figure read too low, and that is the one direction of error worth being loud
-/// about.
+/// There is no balance to fill in. Both halves of the number come from Fireworks —
+/// the figure from the account gateway, the total it is out of from the account's
+/// paid invoices — so the Balance pane only has to say what they are, and what it
+/// does when the gateway cannot be reached.
 public struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.colorScheme) private var scheme
@@ -26,8 +25,6 @@ public struct SettingsView: View {
     @State private var pane: SettingsPane = .balance
     @State private var key = ""
     @State private var keyMessage: String?
-    @State private var balance = ""
-    @State private var anchorDate = Date()
     @State private var notifyStatus: String?
 
     /// Observed directly rather than reached through the model: it is an
@@ -122,7 +119,7 @@ public struct SettingsView: View {
             Form {
                 switch pane {
                 case .account: accountSection; accountIDSection
-                case .balance: balanceStatusSection; liveBalanceSection; anchorSection
+                case .balance: balanceStatusSection; creditSection
                 case .alerts: alertSection
                 case .general: generalSection
                 case .updates: updateSection
@@ -140,8 +137,7 @@ public struct SettingsView: View {
         accountSection
         accountIDSection
         balanceStatusSection
-        liveBalanceSection
-        anchorSection
+        creditSection
         alertSection
         generalSection
         updateSection
@@ -149,8 +145,6 @@ public struct SettingsView: View {
     }
 
     private func load() async {
-        balance = model.config.anchorBalance > 0 ? String(format: "%.2f", model.config.anchorBalance) : ""
-        anchorDate = model.config.anchorTime ?? Date()
         let status = await Notifier().currentAuthorization()
         notifyStatus = switch status {
         case .authorized, .provisional, .ephemeral: "Notifications are allowed"
@@ -244,44 +238,47 @@ public struct SettingsView: View {
         }
     }
 
-    private var liveBalanceSection: some View {
-        Section("Balance source") {
-            Toggle("Ask Fireworks for the real balance", isOn: Binding(
-                get: { model.config.liveBalance },
-                set: { value in model.update { $0.liveBalance = value } }
-            ))
-            Text(FireworksConfig.balanceSourceHint(live: model.config.liveBalance))
+    /// What the balance is made of.
+    ///
+    /// Nothing to fill in: the figure and the invoices behind it both come from
+    /// Fireworks. The rows that need the ledger are *absent* rather than zeroed when
+    /// it could not be read — "$0.00 paid in" is a claim, and "could not ask" is not.
+    private var creditSection: some View {
+        Section("Credit") {
+            if let reading = model.reading {
+                creditRow("Balance", Money.formatted(reading.remaining), strong: true)
+                if let credited = reading.credited {
+                    creditRow("Paid in", Money.formatted(credited))
+                    if let used = reading.creditUsed {
+                        creditRow("Used", Money.formatted(used))
+                    }
+                }
+                creditRow("Today", Money.formatted(reading.today))
+                Text(reading.footnote())
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("No reading yet.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Text(FireworksConfig.balanceSourceHint())
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private var anchorSection: some View {
-        Section("Anchor") {
-            HStack {
-                Text("Balance held")
-                Spacer()
-                TextField("e.g. 11.21", text: $balance)
-                    .frame(width: 90)
-                    .textFieldStyle(.roundedBorder)
-                Text("USD").foregroundStyle(.secondary)
-            }
-            DatePicker("As of", selection: $anchorDate, displayedComponents: [.date, .hourAndMinute])
-            HStack(alignment: .firstTextBaseline) {
-                Text(currentAnchor)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                Button("Set anchor") { setAnchor() }
-                    .disabled(Double(balance) == nil || Double(balance) ?? 0 <= 0)
-            }
-            if let reading = model.reading {
-                Text("Measured spend since the anchor: \(Money.formatted(reading.spend)) · remaining \(Money.formatted(reading.remaining))")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-            }
+    private func creditRow(_ label: String, _ value: String, strong: Bool = false) -> some View {
+        HStack {
+            Text(label)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.system(size: strong ? 13 : 12,
+                              weight: strong ? .semibold : .regular))
+                .monospacedDigit()
+                .foregroundStyle(strong ? Color.primary : Color.secondary)
         }
     }
 
@@ -447,7 +444,7 @@ public struct SettingsView: View {
                     Task { await model.refresh() }
                 }
             }
-            Text("Credit is measured by asking Fireworks for its rated cost per local day; the balance is read from the account gateway. Nothing here is estimated unless the gateway cannot be reached, and the popover says so when that happens.")
+            Text("Credit is measured by asking Fireworks for its rated cost per local day; the balance is read from the account gateway, and the total it is out of from the account's paid invoices. Nothing here is filled in by hand, and when the gateway cannot be reached the last figure it gave is shown, marked stale.")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -455,16 +452,6 @@ public struct SettingsView: View {
     }
 
     // MARK: - actions
-
-    private var currentAnchor: String {
-        guard let when = model.config.anchorTime, model.config.anchorBalance > 0 else {
-            return "No anchor yet — without one there is no remaining figure to show"
-        }
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return "Anchored at \(Money.formatted(model.config.anchorBalance)) on \(formatter.string(from: when))"
-    }
 
     private func saveKey() {
         do {
@@ -477,13 +464,6 @@ public struct SettingsView: View {
         } catch {
             keyMessage = "\(error)"
         }
-    }
-
-    private func setAnchor() {
-        guard let amount = Double(balance.replacingOccurrences(of: "$", with: "")
-            .trimmingCharacters(in: .whitespaces)), amount > 0 else { return }
-        model.setAnchor(amount, at: anchorDate)
-        Task { await model.refresh() }
     }
 }
 

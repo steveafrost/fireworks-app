@@ -16,29 +16,33 @@ the app reads the real figure with no gRPC library and no generated protos (see
 `Core/Sources/FireworksCore/Balance.swift`).
 
 ```
-remaining = the account's real balance          # preferred
-remaining = anchor_balance − rated spend        # fallback, and all there used to be
+remaining = the balance Fireworks reports                  # the figure
+credited  = the account's paid invoices, added up          # what it is out of
 ```
 
-So the number is now the one Fireworks reports, and the anchor is only what
-stands in when the gateway cannot be reached — a distinction the popover makes
-explicit (`live balance` vs `anchor estimate` in the line under the credit bar).
-A first run adopts the live balance as its anchor, so a fresh install no longer
-has to be taught a figure the API will hand over, and the anchor is never
-overwritten once it exists. Turning the call off in Settings leaves the old
-subtraction and makes no request to the gateway.
+Nothing is subtracted, and nothing is typed in. The balance comes from
+`gateway.Gateway/GetBalance`; the total it is out of comes from
+`gateway.Gateway/ListInvoices`, which returns the same three paid prepaid top-ups
+`firectl billing list-invoices` prints (`$5 + $5 + $10 = $20.00` for this account).
+An invoice that has been raised but not paid is excluded — it has no amount on it,
+and an open invoice is not money in.
 
-Credit *added* is available too, from the same gateway (`ListInvoices` returns the
-prepaid top-ups: they are what `firectl billing list-invoices` prints). Not read
-yet — the balance alone is enough to stop guessing.
+`credited` is what the percentages mean. The menu-bar dial's arc, the "% of the
+credit" figure on the gauge and the warn-at-70/90% alerts are all measured against
+what was paid in, so a top-up moves the denominator by itself instead of making the
+remaining figure read too low. There is no balance field in Settings and no
+balance toggle: the figure and the invoices behind it both come from Fireworks.
+When the gateway cannot be reached the last balance it reported is shown, marked
+`stale` under the bar, and the previous denominator is carried forward so an outage
+does not empty the dial.
 
 ## Layout
 
 | Path | What it is |
 |---|---|
 | `Core/` | Swift package: the whole engine, no UI, no third-party dependencies |
-| `Core/Sources/FireworksCore/` | API client, balance gateway call, config, anchor math, day series, alert planning, key handling |
-| `Core/Tests/FireworksCoreTests/` | 76 tests, no network, no simulator (`swift test`) |
+| `Core/Sources/FireworksCore/` | API client, balance + invoice gateway calls, config, credit ledger, day series, alert planning, key handling |
+| `Core/Tests/FireworksCoreTests/` | 86 tests, no network, no simulator (`swift test`) |
 | `project.yml` | XcodeGen spec for the app + widget targets (the `.xcodeproj` is generated, never committed) |
 | `Mac/` | menu-bar app (no Dock icon, popover UI) |
 | `iOS/` | iPhone/iPad app |
@@ -62,7 +66,7 @@ app, the iOS app and every widget compile the same source.
   rate, days left, the daily series) into the App Group container
   (`group.com.whitebox.fireworks`); widgets render that and never fetch.
 - The settings and cache file names match the SwiftBar plugin's, so on a Mac
-  that ran the plugin first, the app picks up the existing anchor and alert
+  that ran the plugin first, the app picks up the existing balance, thresholds and alert
   history instead of starting over.
 
 ## Building

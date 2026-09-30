@@ -225,7 +225,7 @@ public struct CreditGauge: View {
                         .foregroundStyle(ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    Text("\(Int((reading.share * 100).rounded()))% of \(Money.formatted(reading.anchorBalance))")
+                    Text("\(Int((reading.share * 100).rounded()))% \(reading.creditLine())")
                         .font(.system(size: size * 0.095))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -247,8 +247,8 @@ public struct CreditGauge: View {
         .frame(width: size, height: size)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(Money.formatted(reading.remaining)) left, "
-                            + "\(Int((reading.share * 100).rounded())) percent of "
-                            + Money.formatted(reading.anchorBalance))
+                            + "\(Int((reading.share * 100).rounded())) percent "
+                            + reading.creditLine())
     }
 }
 

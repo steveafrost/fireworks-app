@@ -25,14 +25,14 @@ public enum AppGroup {
 public struct FireworksConfig: Codable, Sendable, Equatable {
     /// Blank = discover it from the API key via `GET /v1/accounts`.
     public var account: String = ""
-    /// The balance held at `anchorTime`. It is the *fallback* figure: the
-    /// account gateway reports the real balance (see `BalanceRPC`), and this is
-    /// what the app measures down from when that call cannot be made.
+    /// The last balance Fireworks reported, remembered so there is a figure to show
+    /// when the account gateway cannot be reached.
+    ///
+    /// Not a setting. It is written from the live balance on every successful read
+    /// and never typed by anyone; `anchorTime` is when the app first saw one. Kept
+    /// under the old key names so a Mac that ran the plugin first keeps its file.
     public var anchorBalance: Double = 0
     public var anchorTime: Date?
-    /// Ask the account gateway for the real balance on every refresh. Off means
-    /// the anchored estimate is used and no call is made to the gateway.
-    public var liveBalance: Bool = true
     /// The title turns amber/red at these amounts, and they drive the
     /// low/critical alerts.
     public var lowThreshold: Double = 3.00
@@ -46,7 +46,7 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
     public var refreshSeconds: Int = 300
     /// Desktop/iOS alerts on threshold crossings.
     public var notify: Bool = true
-    /// The crossings to warn on, as a share of the anchor already *spent*.
+    /// The crossings to warn on, as a share of the credit already *spent*.
     public var notifyPercent: [Int] = [70, 90]
     /// Warn at every 10% instead of only `notifyPercent`.
     public var notifyEveryTen: Bool = false
@@ -55,7 +55,6 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
         case account
         case anchorBalance = "anchor_balance"
         case anchorTime = "anchor_time"
-        case liveBalance = "live_balance"
         case lowThreshold = "low_threshold"
         case criticalThreshold = "critical_threshold"
         case historyDays = "history_days"
@@ -75,7 +74,6 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
         anchorBalance = (try? values.decode(Double.self, forKey: .anchorBalance))
             ?? defaults.anchorBalance
         anchorTime = try? values.decodeIfPresent(Date.self, forKey: .anchorTime)
-        liveBalance = (try? values.decode(Bool.self, forKey: .liveBalance)) ?? defaults.liveBalance
         lowThreshold = (try? values.decode(Double.self, forKey: .lowThreshold))
             ?? defaults.lowThreshold
         criticalThreshold = (try? values.decode(Double.self, forKey: .criticalThreshold))
@@ -134,18 +132,19 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
               + "Fill this in only if the key can see several accounts and it has to be told which one."
     }
 
-    /// What the balance toggle means, in the words the settings panel shows.
+    /// What the balance is made of, in the words the settings panel shows.
     ///
     /// Here rather than in the view for the same reason `accountHint` is: the
     /// settings pane is a `Form`, which the offscreen renderer draws as nothing,
     /// so this copy is verified by test rather than by looking at a picture.
-    public static func balanceSourceHint(live: Bool) -> String {
-        live
-            ? "On — the app asks the account gateway what the balance is (the figure "
-              + "firectl prints) and falls back to the anchor only if that call cannot be made."
-            : "Off — no balance call is made, so what is left is the anchor minus measured spend."
+    public static func balanceSourceHint() -> String {
+        "Fireworks reports this balance and the invoices it came from, so there is "
+        + "nothing to fill in: if the gateway cannot be reached the last figure it "
+        + "gave is shown, marked stale."
     }
 
+    /// Whether a balance has ever been read. Not a setting either — a fresh install
+    /// becomes anchored by its first successful read.
     public var isAnchored: Bool {
         anchorBalance > 0 && anchorTime != nil
     }
