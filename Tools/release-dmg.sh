@@ -74,16 +74,39 @@ say "Generating the project"
 xcodegen generate >/dev/null
 
 say "Archiving (Release)"
+mkdir -p build/release-evidence
 rm -rf "$ARCHIVE" "$EXPORT"
-xcodebuild -project Fireworks.xcodeproj -scheme Fireworks -configuration Release \
+# Sign nothing at archive time. Two separate reasons, both hit for real:
+#   1. Forcing CODE_SIGN_IDENTITY on top of the project's automatic signing is
+#      refused outright ("conflicting provisioning settings").
+#   2. Letting Xcode sign the archive automatically demands a Mac App
+#      *development* provisioning profile, and this team has no registered Mac
+#      devices, so Xcode fails with "Your team has no devices from which to
+#      generate a provisioning profile".
+# The archive is therefore built unsigned and ALL signing happens in the export
+# below, where the Developer ID profile applies. Developer ID profiles are not
+# device-limited, so this route needs no device registration.
+if ! xcodebuild -project Fireworks.xcodeproj -scheme Fireworks -configuration Release \
   -destination 'generic/platform=macOS' -archivePath "$ARCHIVE" \
-  CODE_SIGN_IDENTITY="$IDENTITY" ENABLE_HARDENED_RUNTIME=YES \
-  -allowProvisioningUpdates archive 2>&1 | tail -3
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ENABLE_HARDENED_RUNTIME=YES \
+  archive > build/release-evidence/archive.log 2>&1; then
+  fail "archive failed:"
+  grep -E "error:" build/release-evidence/archive.log | sort -u | head -10 | sed 's/^/  /'
+  echo "     full log: build/release-evidence/archive.log"
+  exit 1
+fi
+ok "archived unsigned → $ARCHIVE (signing happens at export)"
 
 say "Exporting with the Developer ID profile"
-xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportPath "$EXPORT" \
+if ! xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportPath "$EXPORT" \
   -exportOptionsPlist Config/ExportOptions-developer-id.plist \
-  -allowProvisioningUpdates 2>&1 | tail -3
+  -allowProvisioningUpdates > build/release-evidence/export.log 2>&1; then
+  fail "export failed:"
+  grep -E "error:" build/release-evidence/export.log | sort -u | head -10 | sed 's/^/  /'
+  echo "     full log: build/release-evidence/export.log"
+  exit 1
+fi
+ok "exported, signed with: $IDENTITY"
 
 APP="$EXPORT/Fireworks.app"
 [ -d "$APP" ] || { fail "no app exported"; exit 1; }

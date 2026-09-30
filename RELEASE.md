@@ -119,10 +119,52 @@ Tools/release-dmg.sh --check     # names exactly what is missing
 Tools/release-dmg.sh             # archive → sign → notarize → staple → DMG → cask stanza
 ```
 
-Registering this Mac as a device is only needed to make a *development* build
-team-signed (Xcode → the Fireworks target → Signing & Capabilities → tick
-*Automatically manage signing*). The Login Item (`SMAppService`) has the same
-requirement, so it stays out until one of the two is done.
+## What the first real Developer ID run actually hit (2026-09-30)
+
+With the certificate and the notary credential in place, the script reached a
+Developer ID-signed export and then refused to ship — correctly:
+
+```
+✓ archived unsigned → build/Fireworks-mac.xcarchive (signing happens at export)
+✓ exported, signed with: Developer ID Application: Steve Frost (4QJ25Y85MX)
+  Authority=Developer ID Application: Steve Frost (4QJ25Y85MX)
+  TeamIdentifier=4QJ25Y85MX
+✗ no App Group entitlement — the widget would ship empty
+```
+
+Four findings, each of which cost a run to learn:
+
+1. **The archive must not be signed by Xcode's automatic signing.** Doing so
+   demands a Mac App *development* profile, and this team has no registered Mac
+   devices, so Xcode refuses: *"Your team has no devices from which to generate a
+   provisioning profile."* The archive is therefore built with
+   `CODE_SIGNING_ALLOWED=NO` and every signature is applied at export.
+2. **Do not force `CODE_SIGN_IDENTITY` on top of automatic signing** — Xcode
+   refuses the archive outright with *"conflicting provisioning settings"*.
+3. **The Developer ID export signs with the bare certificate and silently strips
+   the App Group entitlement** when no profile authorises it: the exported app has
+   no `embedded.provisionprofile` and an empty entitlements dict, and the export
+   still prints `** EXPORT SUCCEEDED **`. Nothing warns you. That is why the
+   script verifies the *exported* entitlements instead of trusting the export.
+4. **The App Group ID is registered, and the iOS side is already authorised.**
+   The iOS profiles on this Mac do carry `com.apple.security.application-groups`,
+   and the TestFlight IPA's app *and* widget both carry it. What is missing is the
+   **macOS App IDs** (`com.whitebox.fireworks`, `com.whitebox.fireworks.widgets`)
+   with the App Groups capability: no Mac profile exists at all, which is why the
+   Mac export cannot authorise the claim.
+
+An ad-hoc archive cannot carry the entitlement either — Xcode rejects it with
+*"requires a provisioning profile"*, because App Groups is a restricted
+entitlement. `group.`-prefixed IDs are valid on macOS (Apple Developer Forums,
+Feb 2025), so the identifier itself needs no change.
+
+Registering this Mac as a device (`00006040-001A41141EF8801C`) is the shortest
+route to the rest: with a registered Mac, Xcode's automatic signing creates the
+macOS App IDs, enables the capability and mints the profiles, exactly as it
+already did for the iOS side. The alternative is the same work by hand — App IDs
+with App Groups, then a Developer ID profile for each. The Login Item
+(`SMAppService`) needs the same team-signed footing, so it stays out until one of
+the two is done.
 
 ## Install the running app
 

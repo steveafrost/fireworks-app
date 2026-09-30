@@ -39,9 +39,13 @@ public enum UISnapshot {
         return URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
     }
 
+    #if DEBUG
+    /// `--render-ui-sample` draws a synthetic reading instead of the real one.
+    /// DEBUG-only, like the member it drives: Release ignores the flag.
     private static var wantsSample: Bool {
         CommandLine.arguments.contains("--render-ui-sample")
     }
+    #endif
 
     /// `--render-ui-dark` renders every panel in the dark palette as well. Both
     /// appearances have to be looked at — a colour that reads on the lavender
@@ -55,9 +59,17 @@ public enum UISnapshot {
     @MainActor
     public static func render(to directory: URL, model: AppModel) {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        #if DEBUG
+        // The sample reading exists only in DEBUG builds (see
+        // AppModel.previewInstallSampleReading): a shipped build must never be
+        // able to install a synthetic balance, so the *member* stays gated and
+        // this call site is gated to match. In Release `--render-ui-sample` is
+        // simply ignored — which is also why the Mac Release configuration has
+        // to be compiled before a release, not just Debug.
         if wantsSample {
             model.previewInstallSampleReading()
         }
+        #endif
         let schemes: [ColorScheme] = wantsDark ? [.light, .dark] : [.light]
         var written: [String] = []
         for scheme in schemes {
