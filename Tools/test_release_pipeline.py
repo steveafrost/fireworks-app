@@ -31,14 +31,16 @@ class ReleaseContractTests(unittest.TestCase):
         """xcodebuild piped through `tail` reports a failure with no reason given.
 
         That is how a Release-only compile error and a provisioning failure both
-        arrived as "Archiving project ... (1 failure)". Both steps now log in full
-        and surface the error: lines on failure.
+        arrived as "Archiving project ... (1 failure)". Both build steps now log in
+        full and surface the error: lines on failure. Scoped to the build steps: a
+        `tail` on a codesign verdict elsewhere is fine.
         """
         script = (ROOT / "Tools/release-dmg.sh").read_text()
-        self.assertNotIn("| tail -", script, "piping xcodebuild discards the real error")
-        self.assertIn("build/release-evidence/archive.log", script)
-        self.assertIn('grep -E "error:" build/release-evidence/archive.log', script)
-        self.assertIn('grep -E "error:" build/release-evidence/export.log', script)
+        build = script.split('say "Archiving (Release)"', 1)[1].split("-- verify", 1)[0]
+        self.assertNotIn("| tail -", build, "piping a build step discards the real error")
+        self.assertIn("build/release-evidence/archive.log", build)
+        self.assertIn('grep -E "error:" build/release-evidence/archive.log', build)
+        self.assertIn('grep -E "error:" build/release-evidence/export.log', build)
 
     def test_dmg_is_stapled_before_its_hash_is_published(self):
         script = (ROOT / "Tools/release-dmg.sh").read_text()
