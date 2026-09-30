@@ -60,7 +60,7 @@ public final class AppModel {
         let migrated = carried.isEmpty ? "nothing" : carried.joined(separator: ",")
         let anchorStamp = config.anchorTime.map { Time.isoUTC($0) } ?? "—"
         Diagnostics.log("launch: data=\(dataPath) plugin=\(pluginPath) migrated=\(migrated) "
-                        + "anchored=\(config.isAnchored) anchor=\(config.anchorBalance)@\(anchorStamp) "
+                        + "remembered=\(config.isAnchored) balance=\(config.anchorBalance)@\(anchorStamp) "
                         + "cached_reading=\(reading != nil)")
     }
 
@@ -136,11 +136,21 @@ public final class AppModel {
                 // Remember what Fireworks last said, so a later outage has a figure to
                 // show instead of a blank. Written only when it changes: this is the
                 // fallback, not a setting.
+                var changed = false
                 if let live = fresh.liveBalance, live != config.anchorBalance {
                     config.anchorBalance = live
                     config.anchorTime = config.anchorTime ?? fresh.balanceSeenAt ?? Date()
-                    try? ConfigStore.save(config, to: SharedContainer.directory)
+                    changed = true
                 }
+                // The cycle is persisted for the same reason: it is what the
+                // percentages divide by, and without it a relaunch would fall back to
+                // the lifetime total and the dial would refill for no reason.
+                if let cycle = fresh.cycleBalance, cycle != config.cycleBalance {
+                    config.cycleBalance = cycle
+                    config.cycleStart = fresh.cycleStart
+                    changed = true
+                }
+                if changed { _ = try? ConfigStore.save(config, to: SharedContainer.directory) }
             }
             if let failure = outcome.error {
                 lastError = failure.errorDescription
@@ -155,6 +165,7 @@ public final class AppModel {
                                 + "today=\(Money.formatted(reading?.today ?? 0)) "
                                 + "balance=\(reading?.sourceWord ?? "—") "
                                 + "credited=\(reading?.credited.map { Money.formatted($0) } ?? "—") "
+                                + "cycle=\(reading?.cycleBalance.map { Money.formatted($0) } ?? "—") "
                                 + "account=\(resolved) events=\(outcome.events.count)")
                 await notifier.deliver(outcome.events, enabled: config.notify)
             }
@@ -222,23 +233,21 @@ public final class AppModel {
               balance.amount > 0 else { return nil }
         account = resolved
         config.account = resolved
-        setAnchor(balance.amount, at: balance.fetchedAt)
+        rememberBalance(balance.amount, at: balance.fetchedAt)
         return balance.amount
     }
 
     // MARK: - settings
 
-    public func setAnchor(_ amount: Double, at when: Date = Date()) {
+    /// Fill the one gap a fresh install has: no figure to show until the first refresh
+    /// lands. The value is Fireworks', never the user's — there is no setting here, and
+    /// a balance already remembered is not overwritten.
+    public func rememberBalance(_ amount: Double, at when: Date = Date()) {
         config.anchorBalance = amount
         config.anchorTime = when
         config.normalise()
         _ = try? ConfigStore.save(config, to: SharedContainer.directory)
         if case .needsAnchor = status { status = .idle }
-    }
-
-    public func reanchorTime(_ when: Date) {
-        config.anchorTime = when
-        _ = try? ConfigStore.save(config, to: SharedContainer.directory)
     }
 
     public func saveKey(_ key: String) throws {
@@ -293,7 +302,12 @@ public final class AppModel {
            anchorTime: now.addingTimeInterval(-4 * 86_400), fetchedAt: now,
            // The live balance is the normal state now, so the sample carries one:
            // the "estimate" suffix is the exception and is covered by test.
-           liveBalance: 2.34)
+           liveBalance: 2.34,
+           // And the normal state is a cycle: $20.00 paid in over the account's life,
+           // $12.50 of it available since the last top-up. Without this the sample
+           // renders the fallback line, which is the one case nobody sees.
+           credited: 20.00, cycleBalance: 12.50,
+           cycleStart: now.addingTimeInterval(-4 * 86_400))
         status = .idle
     }
     #endif

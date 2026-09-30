@@ -197,7 +197,7 @@ public struct OverviewView: View {
 
         var word: String {
             switch self {
-            case .over: return "over anchor"
+            case .over: return "past the balance"
             case .critical: return "critical"
             case .low: return "low"
             case .healthy: return "healthy"
@@ -216,7 +216,10 @@ public struct OverviewView: View {
     private func stateBanner(_ reading: Reading) -> some View {
         switch status(reading) {
         case .over:
-            Banner(text: "Over the anchor by \(Money.formatted(-reading.remaining)) — raise it if you topped up",
+            // Only reachable if the gateway itself reports a negative balance: the
+            // app never subtracts its way to one, so this is arrears, not a missing
+            // starting figure that somebody has to go and set.
+            Banner(text: "Past the reported balance by \(Money.formatted(-reading.remaining))",
                    tone: .critical)
         case .critical:
             Banner(text: "Critical — under your \(Money.formatted(model.config.criticalThreshold)) line",
@@ -286,13 +289,13 @@ struct Banner: View {
     }
 }
 
-/// Onboarding. It has one job: explain why the app needs a starting balance,
-/// because "type in your balance" looks like a missing feature until you know the
-/// API has no balance endpoint. The explanation comes *before* the field.
+/// Onboarding. It has one job: take the key. It used to need two things, because
+/// "what is your balance" was a question only the user could answer — the app now
+/// reads the balance and the credit behind it from Fireworks, so the card says so
+/// rather than asking for a figure it can look up.
 public struct SetupCard: View {
     @Environment(AppModel.self) private var model
     @State private var key = ""
-    @State private var balance = ""
     @State private var error: String?
     @State private var saved = false
 
@@ -306,9 +309,9 @@ public struct SetupCard: View {
                 Text("Fireworks credit left")
                     .eyebrow()
                     .foregroundStyle(.secondary)
-                Text("Two things and you're done")
+                Text("Your key is the whole setup")
                     .font(.system(size: 15, weight: .semibold))
-                Text("Fireworks reports spending, not balance — there is no endpoint that returns your remaining credit, so no app can ask for it. Enter the balance you hold now and everything after this moment is measured spend, subtracted from it.")
+                Text("The balance, the credit it was bought with and the spending that has come off it are all read from Fireworks with your key. Nothing to type in, and nothing to keep up to date: the first figure arrives a moment after you paste it.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -318,18 +321,12 @@ public struct SetupCard: View {
                 SecureField("paste from app.fireworks.ai → API keys", text: $key)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12))
+                    .onSubmit(save)
                 if model.isConfigured || saved {
                     Label("stored in your Keychain", systemImage: "checkmark.seal")
                         .font(.system(size: 10))
                         .foregroundStyle(Palette.green(.light))
                 }
-            }
-
-            field("Balance you hold now") {
-                TextField("e.g. 11.21", text: $balance)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12))
-                    .onSubmit(save)
             }
 
             if let error {
@@ -347,7 +344,7 @@ public struct SetupCard: View {
         }
     }
 
-    /// A labelled input, so the two fields look like the same kind of thing.
+    /// A labelled input, so the card reads like the panels it leads into.
     private func field<Content: View>(_ label: String,
                                       @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -361,19 +358,15 @@ public struct SetupCard: View {
     private func save() {
         error = nil
         do {
-            if !key.trimmingCharacters(in: .whitespaces).isEmpty {
-                try model.saveKey(key)
-                saved = true
-                key = ""
-            }
-            if let amount = Double(balance.replacingOccurrences(of: "$", with: "")
-                .replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)),
-               amount > 0 {
-                model.setAnchor(amount)
-            } else if model.config.anchorBalance <= 0 {
-                error = "Enter the balance you hold, e.g. 11.21"
+            guard !key.trimmingCharacters(in: .whitespaces).isEmpty else {
+                self.error = "Paste your Fireworks API key to start."
                 return
             }
+            try model.saveKey(key)
+            saved = true
+            key = ""
+            // The first reading needs no starting figure from anyone: the gateway is
+            // asked for the balance and for the invoices behind it.
             Task { await model.refresh() }
         } catch let failure as FireworksError {
             error = failure.errorDescription

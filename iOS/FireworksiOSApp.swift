@@ -41,7 +41,7 @@ struct iOSRootView: View {
                         tiles(reading)
                         VStack(alignment: .leading, spacing: 8) {
                             SectionLabel("History",
-                                         detail: "anchored \(Time.compactStamp(reading.anchorTime))")
+                                         detail: "measuring since \(Time.compactStamp(reading.anchorTime))")
                             MetricTable(metrics(reading))
                         }
                         if reading.days.count > 1 {
@@ -54,7 +54,7 @@ struct iOSRootView: View {
                         if !reading.models.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
                                 SectionLabel("Model mix",
-                                             detail: "\(Money.formatted(reading.spend)) since anchor")
+                                             detail: "\(Money.formatted(reading.spend)) in that time")
                                 ModelMix(reading: reading)
                             }
                         }
@@ -113,7 +113,7 @@ struct iOSRootView: View {
             Metric(label: "Yesterday",
                    note: reading.days.dropLast().last.map { Time.displayLabel($0.date) },
                    value: Money.formatted(reading.days.dropLast().last?.cost ?? 0)),
-            Metric(label: "Since anchor", note: "\(Int(reading.hours))h",
+            Metric(label: "Since first reading", note: "\(Int(reading.hours))h",
                    value: Money.formatted(reading.spend)),
             Metric(label: "Last \(reading.days.count) days",
                    note: "\(Money.formatted(reading.windowDailyAverage))/day",

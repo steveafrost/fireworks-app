@@ -105,6 +105,16 @@ public actor RefreshService {
         // the reading marks itself stale — the app does not subtract its way to a
         // number it cannot see.
         let remembered = Money.rounded(live.map(\.amount) ?? config.anchorBalance)
+        let credited = ledger?.credited ?? previous?.credited
+        let added = Self.creditAdded(credited: credited, previous: previous?.credited)
+        // The cycle's credit: what was available when it was last topped up — the
+        // balance then, plus what arrived. Dividing by this rather than by the lifetime
+        // total is what keeps the dial meaningful: a lifetime denominator can only
+        // fall, and it would leave the percent alerts crossed forever.
+        let cycle = added.map { Money.rounded((previous?.remaining ?? config.anchorBalance) + $0) }
+            ?? (config.cycleBalance > 0 ? config.cycleBalance : nil)
+            ?? Self.rebuiltCycle(remaining: remembered, since: ledger?.lastPaid, days: days)
+            ?? credited
         var reading = Reading(
             remaining: remembered,
             spend: Money.rounded(window.subtotal),
@@ -119,8 +129,13 @@ public actor RefreshService {
             liveBalance: live.map { Money.rounded($0.amount) },
             // Carried forward on a failed invoice read: the denominator changes when
             // the account is topped up, not when the network drops.
-            credited: ledger?.credited ?? previous?.credited,
-            balanceSeenAt: live != nil ? now : (previous?.balanceSeenAt ?? config.anchorTime))
+            credited: credited,
+            balanceSeenAt: live != nil ? now : (previous?.balanceSeenAt ?? config.anchorTime),
+            cycleBalance: cycle,
+            cycleStart: added != nil
+                ? now
+                : (config.cycleStart ?? ledger?.lastPaid ?? ledger?.firstPaid ?? config.anchorTime),
+            creditAdded: added)
 
         let (events, memory) = Alerts.plan(reading: reading, config: config,
                                            previous: previous?.alerts,
@@ -128,6 +143,38 @@ public actor RefreshService {
         reading.alerts = memory
         return RefreshOutcome(reading: reading, events: config.notify ? events : [],
                               error: nil, isStale: false)
+    }
+
+    /// Credit added since the previous reading, or nil when nothing arrived — or when
+    /// the ledger could not be read, or there is no previous reading to compare with.
+    ///
+    /// A cent of tolerance: figures are rounded to six places on their way to disk, so
+    /// a rounding crumb must not be read as a top-up and refill the dial.
+    static func creditAdded(credited: Double?, previous: Double?) -> Double? {
+        guard let credited, let previous else { return nil }
+        let difference = Money.rounded(credited - previous)
+        return difference > 0.005 ? difference : nil
+    }
+
+    /// The cycle's credit rebuilt from the newest top-up, for the first run after the
+    /// cycle existed — or a first run on a new Mac.
+    ///
+    /// The balance falls by exactly what has been spent since credit was added, so the
+    /// credit that was available at that top-up is `remaining + spent since then`, and
+    /// the ledger says when it happened. Without this the dial would read the lifetime
+    /// total — the very figure this replaced — until the account was next topped up.
+    ///
+    /// Day granularity is as fine as the spend series goes, so a top-up in the
+    /// afternoon drags that morning's spend into the figure: it reads high by at most
+    /// one day's spend. Nil when the series does not reach back to the top-up, because
+    /// a partial sum would read *low*, and a dial that understates the credit is worse
+    /// than one that names the lifetime total honestly.
+    static func rebuiltCycle(remaining: Double, since: Date?, days: [DayTotal]) -> Double? {
+        guard let since, let earliest = days.first?.date, !days.isEmpty,
+              let key = Time.localDayWindows(now: since, days: 1).last?.0,
+              earliest <= key else { return nil }
+        let spent = days.filter { $0.date >= key }.reduce(0) { $0 + $1.cost }
+        return Money.rounded(remaining + spent)
     }
 
     /// Spend per local day, oldest first, ending with today.

@@ -47,16 +47,36 @@ public struct Reading: Codable, Sendable, Equatable {
     /// was measured, which is a different question — a remembered balance with fresh
     /// spend is exactly the state this names.
     public var balanceSeenAt: Date?
+    /// The credit available when credit was last added: the balance then, plus what
+    /// arrived. What the percentages divide by.
+    ///
+    /// A cycle and not a lifetime total on purpose. Dividing by every dollar ever
+    /// bought is a fraction that can only fall — a steady user's dial ends up pinned
+    /// near empty — and it leaves the percent alerts crossed forever, so they fire
+    /// once and never again. This one refills when credit is added, which is exactly
+    /// when a fresh set of windows is the truth.
+    public var cycleBalance: Double?
+    /// When that cycle started (the top-up that opened it, or the first invoice when
+    /// there has been no top-up since the app started watching).
+    public var cycleStart: Date?
+    /// Credit added since the previous reading, when the ledger showed an increase.
+    /// Non-nil is what makes a top-up detectable — the dial refills and the alert
+    /// windows reset — and it is the figure the top-up alert quotes.
+    public var creditAdded: Double?
 
     /// True when `remaining` is the anchored estimate rather than the account's
     /// real balance — the popover says so rather than passing an estimate off as
     /// the truth.
     public var isEstimated: Bool { liveBalance == nil }
 
-    /// The denominator for the percentages: what was paid in, or the last balance
-    /// Fireworks gave when there is no ledger to divide by. 0 means "cannot say",
-    /// which the views draw as no ring rather than as an empty one.
-    public var denominator: Double { credited ?? anchorBalance }
+    /// The denominator for the percentages: the credit in this cycle, or — before any
+    /// cycle is known — what was paid in, or the last balance Fireworks gave. 0 means
+    /// "cannot say", which the views draw as no ring rather than as an empty one.
+    public var denominator: Double {
+        if let cycleBalance, cycleBalance > 0 { return cycleBalance }
+        if let credited, credited > 0 { return credited }
+        return anchorBalance
+    }
 
     /// Which figure `remaining` is, in the one word the popover has room for.
     public var sourceWord: String { isEstimated ? "stale" : "live" }
@@ -67,6 +87,13 @@ public struct Reading: Codable, Sendable, Equatable {
     public var creditUsed: Double? {
         guard let credited else { return nil }
         return Money.rounded(max(0, credited - remaining))
+    }
+
+    /// Every dollar spent out of *this* cycle's credit — the number the dial is the
+    /// remainder of.
+    public var cycleUsed: Double? {
+        guard let cycleBalance, cycleBalance > 0 else { return nil }
+        return Money.rounded(max(0, cycleBalance - remaining))
     }
 
     /// The line under the credit bar: when the figure was measured.
@@ -89,6 +116,9 @@ public struct Reading: Codable, Sendable, Equatable {
     /// What the balance is out of, in prose, for the views that show a percentage
     /// and have to say what it is a percentage of.
     public func creditLine() -> String {
+        if let cycleBalance, cycleBalance > 0 {
+            return "of \(Money.formatted(cycleBalance)) this cycle"
+        }
         if let credited, credited > 0 {
             return "of \(Money.formatted(credited)) credited"
         }
@@ -96,6 +126,13 @@ public struct Reading: Codable, Sendable, Equatable {
             return "of \(Money.formatted(anchorBalance)) last seen"
         }
         return "with no credit history yet"
+    }
+
+    /// The lifetime figures, for the pane that shows history. Nil when the ledger has
+    /// not been read — a row that says "$0.00 paid in" would be a claim.
+    public func allTimeLine() -> String? {
+        guard let credited, credited > 0, let used = creditUsed else { return nil }
+        return "All time: \(Money.formatted(used)) used of \(Money.formatted(credited)) paid in"
     }
 
     public enum CodingKeys: String, CodingKey {
@@ -106,6 +143,9 @@ public struct Reading: Codable, Sendable, Equatable {
         case fetchedAt = "fetched_at"
         case liveBalance = "live_balance"
         case balanceSeenAt = "balance_seen_at"
+        case cycleBalance = "cycle_balance"
+        case cycleStart = "cycle_start"
+        case creditAdded = "credit_added"
         case costUsd = "cost"
     }
 
@@ -127,13 +167,17 @@ public struct Reading: Codable, Sendable, Equatable {
         try values.encodeIfPresent(liveBalance, forKey: .liveBalance)
         try values.encodeIfPresent(credited, forKey: .credited)
         try values.encodeIfPresent(balanceSeenAt, forKey: .balanceSeenAt)
+        try values.encodeIfPresent(cycleBalance, forKey: .cycleBalance)
+        try values.encodeIfPresent(cycleStart, forKey: .cycleStart)
+        try values.encodeIfPresent(creditAdded, forKey: .creditAdded)
     }
 
     public init(remaining: Double, spend: Double, today: Double, models: [String: Double],
                 days: [DayTotal], hours: Double, hoursToday: Double, anchorBalance: Double,
                 anchorTime: Date, fetchedAt: Date, alerts: AlertMemory? = nil,
                 liveBalance: Double? = nil, credited: Double? = nil,
-                balanceSeenAt: Date? = nil) {
+                balanceSeenAt: Date? = nil, cycleBalance: Double? = nil,
+                cycleStart: Date? = nil, creditAdded: Double? = nil) {
         self.remaining = remaining
         self.spend = spend
         self.today = today
@@ -148,6 +192,9 @@ public struct Reading: Codable, Sendable, Equatable {
         self.liveBalance = liveBalance
         self.credited = credited
         self.balanceSeenAt = balanceSeenAt
+        self.cycleBalance = cycleBalance
+        self.cycleStart = cycleStart
+        self.creditAdded = creditAdded
     }
 
     public init(from decoder: Decoder) throws {
@@ -166,6 +213,9 @@ public struct Reading: Codable, Sendable, Equatable {
         liveBalance = try? values.decodeIfPresent(Double.self, forKey: .liveBalance)
         credited = try? values.decodeIfPresent(Double.self, forKey: .credited)
         balanceSeenAt = try? values.decodeIfPresent(Date.self, forKey: .balanceSeenAt)
+        cycleBalance = try? values.decodeIfPresent(Double.self, forKey: .cycleBalance)
+        cycleStart = try? values.decodeIfPresent(Date.self, forKey: .cycleStart)
+        creditAdded = try? values.decodeIfPresent(Double.self, forKey: .creditAdded)
     }
 
     /// The fraction of the credit that is left — the dial's arc.
@@ -283,11 +333,18 @@ public enum ReadingStore {
         public var account: String
         /// What was paid in, so a widget can say what the balance is out of.
         public var credited: Double?
+        /// The credit in this cycle — see `Reading.cycleBalance`. The figure the
+        /// widget's percentage divides by, ahead of the lifetime total.
+        public var cycleBalance: Double?
 
-        /// The figure the percentage is out of: the credited total, or the last
-        /// balance when there is no ledger. 0 means the widget has nothing to draw a
-        /// fraction from.
-        public var denominator: Double { credited ?? anchorBalance }
+        /// The figure the percentage is out of: this cycle's credit, or the credited
+        /// total, or the last balance when there is no ledger. 0 means the widget has
+        /// nothing to draw a fraction from.
+        public var denominator: Double {
+            if let cycleBalance, cycleBalance > 0 { return cycleBalance }
+            if let credited, credited > 0 { return credited }
+            return anchorBalance
+        }
 
         /// The fraction of the credit still there, 0–1 — what a bar or a ring draws.
         ///
@@ -309,6 +366,7 @@ public enum ReadingStore {
             days = reading.days
             self.account = account
             credited = reading.credited
+            cycleBalance = reading.cycleBalance
         }
     }
 

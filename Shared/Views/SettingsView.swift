@@ -240,17 +240,18 @@ public struct SettingsView: View {
 
     /// What the balance is made of.
     ///
-    /// Nothing to fill in: the figure and the invoices behind it both come from
-    /// Fireworks. The rows that need the ledger are *absent* rather than zeroed when
-    /// it could not be read — "$0.00 paid in" is a claim, and "could not ask" is not.
+    /// Nothing to fill in: the figure, the cycle it is being spent from and the
+    /// invoices behind both come from Fireworks. The rows that need the ledger are
+    /// *absent* rather than zeroed when it could not be read — "$0.00 paid in" is a
+    /// claim, and "could not ask" is not.
     private var creditSection: some View {
         Section("Credit") {
             if let reading = model.reading {
                 creditRow("Balance", Money.formatted(reading.remaining), strong: true)
-                if let credited = reading.credited {
-                    creditRow("Paid in", Money.formatted(credited))
-                    if let used = reading.creditUsed {
-                        creditRow("Used", Money.formatted(used))
+                if let cycle = reading.cycleBalance, cycle > 0 {
+                    creditRow("This cycle", Money.formatted(cycle))
+                    if let used = reading.cycleUsed {
+                        creditRow("Used of it", Money.formatted(used))
                     }
                 }
                 creditRow("Today", Money.formatted(reading.today))
@@ -258,6 +259,12 @@ public struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let allTime = reading.allTimeLine() {
+                    Text(allTime)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } else {
                 Text("No reading yet.")
                     .font(.system(size: 11))
@@ -307,7 +314,7 @@ public struct SettingsView: View {
                 ))
                 .frame(width: 110)
                 .textFieldStyle(.roundedBorder)
-                Text("% of the anchor spent").foregroundStyle(.secondary)
+                Text("% of this cycle's credit spent").foregroundStyle(.secondary)
             }
             Toggle("Also notify every 10% of spend", isOn: Binding(
                 get: { model.config.notifyEveryTen },

@@ -37,6 +37,9 @@ struct FakeSource: CostSource {
     /// What the invoice ledger answers. Nil by default, like `live`: a source with
     /// no ledger, which is the state the denominator has to fall back from.
     var credited: Double?
+    /// When the newest paid invoice was issued. Nil by default, which is the state
+    /// the cycle cannot be rebuilt from.
+    var lastPaid: Date?
 
     func balance() async throws -> CreditBalance {
         if let liveFailure { throw liveFailure }
@@ -50,7 +53,7 @@ struct FakeSource: CostSource {
         guard let credited else {
             throw FireworksError(kind: .transport("no ledger"))
         }
-        return CreditLedger(credited: credited, paidInvoices: 1)
+        return CreditLedger(credited: credited, paidInvoices: 1, lastPaid: lastPaid)
     }
 
     func costs(start: Date, end: Date, groupBy: [String]) async throws -> CostWindow {
@@ -299,14 +302,17 @@ final class AlertTests: XCTestCase {
     }
 
     func reading(_ remaining: Double, anchor: Double = 6.0,
-                 anchorTime: Date? = nil, spend: Double? = nil) -> Reading {
+                 anchorTime: Date? = nil, spend: Double? = nil,
+                 credited: Double? = nil, cycle: Double? = nil,
+                 creditAdded: Double? = nil) -> Reading {
         Reading(remaining: remaining,
                 spend: spend ?? (anchor - remaining),
                 today: 0, models: [:], days: [],
                 hours: 17, hoursToday: 6,
                 anchorBalance: anchor,
                 anchorTime: anchorTime ?? config.anchorTime!,
-                fetchedAt: date(2026, 9, 17, 16, 30))
+                fetchedAt: date(2026, 9, 17, 16, 30),
+                credited: credited, cycleBalance: cycle, creditAdded: creditAdded)
     }
 
     func memory(_ fired: [String: Int] = [:], anchor: Double? = 6.0,
@@ -363,22 +369,28 @@ final class AlertTests: XCTestCase {
     }
 
     func testATopUpIsAnnouncedAndReArmsTheThresholds() {
+        // Money in the ledger from one refresh to the next IS the top-up: it refills
+        // the cycle, so the thresholds below the new figure can warn again.
         let (events, alertMemory) = Alerts.plan(
-            reading: reading(5.0, anchor: 12.0), config: config,
+            reading: reading(5.0, anchor: 12.0, credited: 12.0, cycle: 12.0, creditAdded: 6.0),
+            config: config,
             previous: memory(["pct:70": 1, "pct:90": 1, "usd:low": 1]))
         XCTAssertEqual(events.map(\.kind), [.refill])
-        XCTAssertTrue(events[0].message.contains("$12.00"))
-        XCTAssertTrue(events[0].message.contains("was $6.00"))
+        XCTAssertTrue(events[0].message.contains("$6.00 more to spend"))
+        XCTAssertTrue(events[0].subtitle.contains("$12.00 this cycle"))
         XCTAssertEqual(alertMemory.fired, [:])          // everything can warn again
-        XCTAssertEqual(alertMemory.anchorBalance, 12.0)
+        XCTAssertEqual(alertMemory.anchorBalance, 12.0, "keyed to the cycle, not the balance")
     }
 
-    func testRestampingTheAnchorTimeAloneResetsQuietly() {
+    func testWithNoCreditAddedAStillCrossedThresholdNeitherWarnsAgainNorResets() {
+        // The refresh clock is not a top-up, and neither is the window moving: a
+        // threshold still crossed stays in the memory, so it warns once rather than
+        // every five minutes.
         let (events, alertMemory) = Alerts.plan(
-            reading: reading(5.0, anchorTime: date(2026, 9, 17, 0, 0)), config: config,
+            reading: reading(1.50, anchorTime: date(2026, 9, 17, 0, 0)), config: config,
             previous: memory(["pct:70": 1]))
-        XCTAssertTrue(events.isEmpty)                   // not a top-up, so no alert
-        XCTAssertEqual(alertMemory.fired, [:])
+        XCTAssertTrue(events.isEmpty)
+        XCTAssertEqual(alertMemory.fired, ["pct:70": 1])
     }
 
     func testTheLowLineWarnsOnceAndReArmsWhenCreditReturns() {

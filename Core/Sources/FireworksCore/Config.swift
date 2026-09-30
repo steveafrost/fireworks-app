@@ -33,6 +33,15 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
     /// under the old key names so a Mac that ran the plugin first keeps its file.
     public var anchorBalance: Double = 0
     public var anchorTime: Date?
+    /// The credit the percentages are measured against: what was available when
+    /// credit was last added (the balance then, plus what arrived), and 0 when no
+    /// cycle has been seen yet.
+    ///
+    /// Not a setting. It is set by the app when the invoice ledger shows more credit
+    /// than last time, which is what makes the dial refill on a top-up — and what
+    /// keeps it from dividing by every dollar ever spent on the account.
+    public var cycleBalance: Double = 0
+    public var cycleStart: Date?
     /// The title turns amber/red at these amounts, and they drive the
     /// low/critical alerts.
     public var lowThreshold: Double = 3.00
@@ -55,6 +64,8 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
         case account
         case anchorBalance = "anchor_balance"
         case anchorTime = "anchor_time"
+        case cycleBalance = "cycle_balance"
+        case cycleStart = "cycle_start"
         case lowThreshold = "low_threshold"
         case criticalThreshold = "critical_threshold"
         case historyDays = "history_days"
@@ -74,6 +85,9 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
         anchorBalance = (try? values.decode(Double.self, forKey: .anchorBalance))
             ?? defaults.anchorBalance
         anchorTime = try? values.decodeIfPresent(Date.self, forKey: .anchorTime)
+        cycleBalance = (try? values.decode(Double.self, forKey: .cycleBalance))
+            ?? defaults.cycleBalance
+        cycleStart = try? values.decodeIfPresent(Date.self, forKey: .cycleStart)
         lowThreshold = (try? values.decode(Double.self, forKey: .lowThreshold))
             ?? defaults.lowThreshold
         criticalThreshold = (try? values.decode(Double.self, forKey: .criticalThreshold))
@@ -138,9 +152,10 @@ public struct FireworksConfig: Codable, Sendable, Equatable {
     /// settings pane is a `Form`, which the offscreen renderer draws as nothing,
     /// so this copy is verified by test rather than by looking at a picture.
     public static func balanceSourceHint() -> String {
-        "Fireworks reports this balance and the invoices it came from, so there is "
-        + "nothing to fill in: if the gateway cannot be reached the last figure it "
-        + "gave is shown, marked stale."
+        "The percentage is measured against the credit you had when you last added "
+        + "credit, so it refills on a top-up. The balance and the invoices behind it "
+        + "both come from Fireworks: if the gateway cannot be reached the last figure "
+        + "it gave is shown, marked stale."
     }
 
     /// Whether a balance has ever been read. Not a setting either — a fresh install

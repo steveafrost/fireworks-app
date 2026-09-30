@@ -140,9 +140,11 @@ struct MenuBarLabel: View {
             Image(nsImage: MenuBarDial.image(fraction: reading.share))
                 .renderingMode(.template)
                 .foregroundStyle(.primary)
-                .help("\(Money.formatted(reading.remaining)) left of \(Money.formatted(reading.anchorBalance))"
+                .help("\(Money.formatted(reading.remaining)) \(reading.creditLine())"
                       + " · \(Int((reading.share * 100).rounded()))% left"
-                      + " · \(Money.formatted(reading.spend)) spent since \(Time.displayStamp(reading.anchorTime))")
+                      + " · \(Money.formatted(reading.spend)) spent over the "
+                      + "\(Int(reading.hours.rounded()))h measured since "
+                      + "\(Time.displayStamp(reading.anchorTime))")
         } else {
             // Unknown is not empty: a dial at zero share is a state someone can
             // be in, so the unconfigured case stays a different glyph.

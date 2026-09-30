@@ -83,17 +83,26 @@ public enum Alerts {
         let seedOnly = isFirstRun || previous?.reference == nil
 
         let prior = previous?.reference
-        let raised = prior.map { reading.denominator > $0 + 0.005 } ?? false
-        let retimed = previous?.anchorTime != nil && previous?.anchorTime != reading.anchorTime
-        if !seedOnly && (raised || retimed) {
-            // A fresh window: everything below the new figure can warn again. Only a
-            // real addition of credit is a top-up — re-stamping the time says nothing.
-            if raised, let prior {
-                events.append(AlertEvent(
-                    kind: .refill,
-                    message: "Credit added — \(Money.formatted(reading.denominator)) in total now (was \(Money.formatted(prior)))",
-                    subtitle: "Windows reset · \(Money.formatted(reading.remaining)) left"))
-            }
+        let added = reading.creditAdded ?? 0
+        if !seedOnly && added > 0.005 {
+            // Credit arriving is the event that re-arms everything: the percentage is
+            // measured against this cycle's credit, so a top-up lowers it and the
+            // thresholds below it can warn again. Saying so is the difference between
+            // "why did it warn again" and "I topped up".
+            events.append(AlertEvent(
+                kind: .refill,
+                message: "Credit added — \(Money.formatted(added)) more to spend",
+                subtitle: "\(Money.formatted(reading.denominator)) this cycle · "
+                    + "\(Money.formatted(reading.remaining)) left"))
+            fired = [:]
+        } else if !seedOnly, let prior, reading.denominator > prior + 0.005 {
+            // The divider grew without the ledger naming an amount — a first ledger
+            // read, or a cache written before the cycle existed. Same effect, less to
+            // say about it.
+            events.append(AlertEvent(
+                kind: .refill,
+                message: "Credit now measured against \(Money.formatted(reading.denominator))",
+                subtitle: "Windows reset · \(Money.formatted(reading.remaining)) left"))
             fired = [:]
         }
 
@@ -148,6 +157,9 @@ public enum Alerts {
     /// measurement. Without one, the measured window is the only figure there is, and
     /// the subtitle says so rather than implying the ledger's total.
     static func creditSubtitle(_ reading: Reading) -> String {
+        if let cycle = reading.cycleBalance, let used = reading.cycleUsed {
+            return "\(Money.formatted(used)) spent of this cycle's \(Money.formatted(cycle))"
+        }
         if let used = reading.creditUsed {
             return "\(Money.formatted(used)) spent of the \(Money.formatted(reading.denominator)) credited"
         }

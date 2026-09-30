@@ -124,7 +124,7 @@ final class RefreshServiceTests: XCTestCase {
         let outcome = await refresh(source: source, previous: prior)
         XCTAssertEqual(outcome.events.map(\.kind), [.spend])
         XCTAssertEqual(outcome.events.first?.message.contains("70%"), true)
-        XCTAssertEqual(outcome.events.first?.subtitle.contains("$15.00 spent of the $20.00 credited"),
+        XCTAssertEqual(outcome.events.first?.subtitle.contains("$15.00 spent of this cycle's $20.00"),
                        true)
         XCTAssertEqual(outcome.reading?.alerts?.fired, ["pct:70": 1])
 
@@ -136,9 +136,9 @@ final class RefreshServiceTests: XCTestCase {
     }
 
     func testATopUpRearmsTheWindowsAndSaysSo() async {
-        // Credit added is a real event: the percentages are measured against the
-        // ledger, so a bigger ledger re-arms every threshold — and saying so is the
-        // difference between "why did it warn again" and "I topped up".
+        // Credit added is a real event: the percentages are measured against the cycle,
+        // so a top-up lowers them, re-arms every threshold and refills the dial. Money
+        // arriving is detected from the ledger showing more than last time.
         let prior = Reading(remaining: 5.00, spend: 0.50, today: 0, models: [:], days: [],
                             hours: 12, hoursToday: 6, anchorBalance: 5.00,
                             anchorTime: config.anchorTime!,
@@ -150,8 +150,10 @@ final class RefreshServiceTests: XCTestCase {
                                                        credited: 40.00),
                                     previous: prior)
         XCTAssertEqual(outcome.events.map(\.kind), [.refill])
-        XCTAssertEqual(outcome.events.first?.message.contains("$40.00"), true)
+        XCTAssertEqual(outcome.events.first?.message.contains("$20.00 more to spend"), true)
+        XCTAssertEqual(outcome.events.first?.subtitle.contains("$25.00 this cycle"), true)
         XCTAssertEqual(outcome.reading?.alerts?.fired, [:], "the windows are re-armed")
+        XCTAssertEqual(outcome.reading?.share ?? 0, 1.0, accuracy: 1e-9, "and the dial is full")
     }
 
     func testAlertsOffProducesNoEventsButStillRemembers() async {
