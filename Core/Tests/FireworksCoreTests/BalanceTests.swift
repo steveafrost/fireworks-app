@@ -186,22 +186,21 @@ final class BalanceTests: XCTestCase {
 
     func testThePopoverSaysWhichFigureItIsShowing() {
         // The popover cannot be screenshotted on this Mac, so the footnote it
-        // draws is asserted here: both wordings, and that nothing else in the
-        // line changes when the source does.
+        // draws is asserted here: the time, and the one word that keeps an
+        // estimate from reading as something Fireworks reported.
+        let measuredAt = Date(timeIntervalSince1970: 1_760_400_000)
         let anchored = Reading(remaining: 4.74, spend: 1.26, today: 0.42, models: [:],
                                days: [], hours: 10, hoursToday: 5, anchorBalance: 6,
                                anchorTime: Date(timeIntervalSince1970: 1_760_000_000),
-                               fetchedAt: Date(timeIntervalSince1970: 1_760_400_000))
+                               fetchedAt: measuredAt)
         XCTAssertTrue(anchored.isEstimated)
-        XCTAssertTrue(anchored.footnote().contains("anchor estimate"))
-        XCTAssertTrue(anchored.footnote().contains("$1.26"))
+        XCTAssertEqual(anchored.footnote(), "Last updated: \(Time.clock(measuredAt)) · estimate")
 
         var live = anchored
         live.liveBalance = anchored.remaining
         XCTAssertFalse(live.isEstimated)
-        XCTAssertTrue(live.footnote().contains("live balance"))
-        XCTAssertEqual(anchored.footnote().count - live.footnote().count,
-                       "anchor estimate".count - "live balance".count)
+        XCTAssertEqual(live.footnote(), "Last updated: \(Time.clock(measuredAt))")
+        XCTAssertFalse(live.footnote().contains("estimate"))
     }
 
     /// A source that behaves like the API does about a zero-length window: it

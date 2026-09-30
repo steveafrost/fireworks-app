@@ -278,7 +278,10 @@ public final class AppModel {
                             cost: [0.11, 1.94, 1.27, 0.11, 0, 0.09, 1.94][offset],
                             today: offset == 6)
         }, hours: 96, hoursToday: 14, anchorBalance: 20.00,
-           anchorTime: now.addingTimeInterval(-4 * 86_400), fetchedAt: now)
+           anchorTime: now.addingTimeInterval(-4 * 86_400), fetchedAt: now,
+           // The live balance is the normal state now, so the sample carries one:
+           // the "estimate" suffix is the exception and is covered by test.
+           liveBalance: 2.34)
         status = .idle
     }
     #endif

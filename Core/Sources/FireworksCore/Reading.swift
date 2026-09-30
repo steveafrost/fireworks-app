@@ -43,18 +43,23 @@ public struct Reading: Codable, Sendable, Equatable {
     /// the truth.
     public var isEstimated: Bool { liveBalance == nil }
 
-    /// Which figure `remaining` is, in the two words the popover has room for.
-    public var sourceWord: String { isEstimated ? "anchor estimate" : "live balance" }
+    /// Which figure `remaining` is, in the one word the popover has room for.
+    public var sourceWord: String { isEstimated ? "estimate" : "live" }
 
-    /// The line under the credit bar: what was spent, which figure the number
-    /// above it is, and when it was measured.
+    /// The line under the credit bar: when the figure was measured.
+    ///
+    /// Just the time: the panel is already dense, and "spent since the anchor"
+    /// lives in Settings beside the anchor itself. The one thing that is *not*
+    /// dropped is the exception — when the gateway could not be reached the
+    /// number is an estimate, and a line that says only "Last updated" would
+    /// pass a subtraction off as something Fireworks reported.
     ///
     /// In Core rather than in the view because it is one string with two states,
-    /// and the popover it appears in cannot be screenshotted on a Mac without
-    /// Screen Recording permission — so it is verified by test.
+    /// and the popover cannot be screenshotted on a Mac without Screen Recording
+    /// permission — so it is verified by test.
     public func footnote() -> String {
-        "\(Money.formatted(spend)) spent since \(Time.compactStamp(anchorTime))"
-            + " · \(sourceWord) · updated \(Time.clock(fetchedAt))"
+        let stamp = "Last updated: \(Time.clock(fetchedAt))"
+        return isEstimated ? "\(stamp) · estimate" : stamp
     }
 
     public enum CodingKeys: String, CodingKey {
