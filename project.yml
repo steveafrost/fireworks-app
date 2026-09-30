@@ -48,6 +48,11 @@ settings:
 packages:
   FireworksCore:
     path: Core
+  # Sparkle, for updates outside the App Store. Only the macOS target links it:
+  # the iOS target is App-Store-shaped and gets updates from there instead.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.10.0
 
 targets:
   # ---------------------------------------------------------------- macOS app
@@ -61,6 +66,7 @@ targets:
         buildPhase: resources
     dependencies:
       - package: FireworksCore
+      - package: Sparkle
       - target: FireworksWidgets
         embed: true
         codeSign: true

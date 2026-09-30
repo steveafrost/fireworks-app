@@ -19,6 +19,11 @@ public struct SettingsView: View {
     @State private var anchorDate = Date()
     @State private var notifyStatus: String?
 
+    /// Observed directly rather than reached through the model: it is an
+    /// ObservableObject inside an @Observable one, and only a direct
+    /// subscription repaints this pane when Sparkle reports a finished check.
+    @ObservedObject private var updater = AppModel.shared.updater
+
     public init() {}
 
     public var body: some View {
@@ -27,6 +32,7 @@ public struct SettingsView: View {
             anchorSection
             alertSection
             behaviourSection
+            updateSection
             aboutSection
         }
         .formStyle(.grouped)
@@ -218,6 +224,41 @@ public struct SettingsView: View {
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var updateSection: some View {
+        Section("Updates") {
+            if updater.isAvailable {
+                Toggle("Check for updates automatically", isOn: Binding(
+                    get: { updater.automaticallyChecks },
+                    set: { updater.automaticallyChecks = $0 }
+                ))
+                HStack(alignment: .firstTextBaseline) {
+                    // A misconfigured feed or key is said out loud: that is the
+                    // one fault in this app that would otherwise never announce
+                    // itself, it would just mean updates stop arriving.
+                    Text(updater.problem ?? updater.statusHint)
+                        .font(.system(size: 10))
+                        .foregroundStyle(updater.problem == nil ? .tertiary : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button("Check Now") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheck)
+                }
+                if let feed = updater.feedURL {
+                    Text("Feed: \(feed.absoluteString)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                // iOS: the App Store owns updates, so there is nothing to toggle.
+                Text(updater.statusHint)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 

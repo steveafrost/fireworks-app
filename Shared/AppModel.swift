@@ -34,6 +34,10 @@ public final class AppModel {
     private var loop: Task<Void, Never>?
     private let notifier = Notifier()
 
+    /// Sparkle, on the platform that has it. Owned by the model so the app
+    /// delegate and the Settings pane drive the same updater.
+    public let updater = Updater()
+
     public init() {
         SharedContainer.prepare()
         let carried = SharedContainer.migrateFromPlugin()
@@ -69,6 +73,7 @@ public final class AppModel {
 
     /// Refresh now, then keep refreshing on the configured cadence.
     public func start() async {
+        updater.start()
         await refresh()
         loop?.cancel()
         loop = Task { [weak self] in

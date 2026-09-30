@@ -34,6 +34,20 @@
 	<string>NSApplication</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
+	<!-- Sparkle. The feed is the appcast published with each release; the key is
+	     the Ed25519 public half of the update-signing key held in the login
+	     Keychain (Sparkle's generate_keys made the pair; sign_update signs each
+	     release with it). Automatic checks are on because a menu-bar app whose
+	     whole job is telling you a balance should not silently rot — the
+	     Settings pane can turn them off, and Sparkle remembers that choice. -->
+	<key>SUFeedURL</key>
+	<string>https://steveafrost.github.io/fireworks-app/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>7XYFIMpgTrJrclrx/iIiVK8pH1l5oz7WRnEEZS59Nqg=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 	<!-- Pin to the same appearance-independent rendering the plugin used, and
 	     declare the one network use: api.fireworks.ai. -->
 	<key>NSAppTransportSecurity</key>

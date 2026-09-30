@@ -22,3 +22,7 @@ xcuserdata/
 build/
 dist/
 *.dmg
+
+# Design sketches: throwaway mockups kept on disk for comparison, never shipped
+# and never part of the app's history. Regenerate or delete at will.
+sketches/
