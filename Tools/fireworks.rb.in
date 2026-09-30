@@ -1,0 +1,15 @@
+# Release template, not an installable cask until release-dmg.sh fills both tokens.
+# The hash is calculated only after the DMG has been notarized and stapled.
+cask "fireworks" do
+  version "@VERSION@"
+  sha256 "@SHA256@"
+
+  url "https://github.com/steveafrost/fireworks-app/releases/download/v#{version}/Fireworks-#{version}.dmg"
+  name "Fireworks"
+  desc "Fireworks AI credit in the menu bar"
+  homepage "https://github.com/steveafrost/fireworks-app"
+
+  depends_on macos: ">= :sonoma"
+
+  app "Fireworks.app"
+end

@@ -45,7 +45,7 @@ else
   fail "no notary credential for keychain profile \"$NOTARY_PROFILE\""
   echo "     One of:"
   echo "       xcrun notarytool store-credentials $NOTARY_PROFILE \\"
-  echo "         --apple-id <your Apple ID> --team-id $TEAM --password <app-specific password>"
+  echo "         --apple-id <your Apple ID> --team-id $TEAM"
   echo "       xcrun notarytool store-credentials $NOTARY_PROFILE \\"
   echo "         --key ~/.appstoreconnect/private_keys/AuthKey_XXXX.p8 \\"
   echo "         --key-id XXXX --issuer <issuer id>"
@@ -77,6 +77,7 @@ say "Archiving (Release)"
 rm -rf "$ARCHIVE" "$EXPORT"
 xcodebuild -project Fireworks.xcodeproj -scheme Fireworks -configuration Release \
   -destination 'generic/platform=macOS' -archivePath "$ARCHIVE" \
+  CODE_SIGN_IDENTITY="$IDENTITY" ENABLE_HARDENED_RUNTIME=YES \
   -allowProvisioningUpdates archive 2>&1 | tail -3
 
 say "Exporting with the Developer ID profile"
@@ -127,29 +128,24 @@ say "Packaging the DMG"
 DMG="$REPO/build/Fireworks-$VERSION.dmg"
 rm -f "$DMG"
 hdiutil create -volname "Fireworks" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
+# Staple the deliverable itself, not only the app inside it. Hash after stapling.
+xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
 SHA="$(shasum -a 256 "$DMG" | awk '{print $1}')"
 ok "$DMG"
 echo "  sha256 $SHA"
 
-say "Homebrew cask stanza"
-cat <<CASK
-cask "fireworks" do
-  version "$VERSION"
-  sha256 "$SHA"
-
-  url "https://github.com/steveafrost/fireworks-app/releases/download/v#{version}/Fireworks-#{version}.dmg"
-  name "Fireworks"
-  desc "Fireworks AI credit in the menu bar"
-  homepage "https://github.com/steveafrost/fireworks-app"
-
-  app "Fireworks.app"
-end
-CASK
+say "Homebrew cask (build/fireworks.rb)"
+sed -e "s/@VERSION@/$VERSION/g" -e "s/@SHA256@/$SHA/g" \
+  Tools/fireworks.rb.in | tee build/fireworks.rb
 
 say "Next"
 cat <<'NEXT'
   1. gh release create v<version> build/Fireworks-<version>.dmg --notes "…"
-  2. Publish the cask (a tap of your own, or a PR to homebrew/cask).
-  3. Add the release to docs/appcast.xml so existing installs are offered it:
-       Tools/sign_update build/Fireworks-<version>.zip   (Sparkle), then edit the feed.
+  2. Copy build/fireworks.rb into Casks/fireworks.rb in your Homebrew tap.
+  3. Sign the final stapled DMG with Sparkle using the existing login-Keychain key:
+       build/dd/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update build/Fireworks-<version>.dmg
+     Then generate the feed entry for that same DMG; see RELEASING.md.
+     Never publish an appcast item before its notarized artifact is available.
 NEXT

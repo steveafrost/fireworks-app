@@ -228,7 +228,7 @@ no longer accept. It is backed up outside the repository, and
       Distribution certificate
 - [ ] TestFlight upload — needs the App Store Connect record and an upload key
 - [ ] Notarized DMG + Homebrew cask — needs a Developer ID certificate
-- [ ] Widget *visible on the Mac* — needs the release machine registered as a device
+- [ ] Widget *drawing on the Mac* — needs a team-signed app and widget with an authorized App Group (the Developer ID route needs no device registration)
 
 [RELEASE.md](RELEASE.md) has the commands, the verified output, and exactly what
 still needs the Apple account.

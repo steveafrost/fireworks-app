@@ -10,12 +10,12 @@ deliberately independent of the Apple account; distribution is not.
 
 ## Why the widget needs release signing
 
-A widget is an app extension, and app extensions are loaded by a plugin host
-that insists on a sandboxed, *team-signed* extension. An ad-hoc signature reports
-`TeamIdentifier=not set`, and an unsandboxed extension is rejected outright — so
-on a Debug build `pluginkit -m -p com.apple.widgetkit-extension` never lists
-`com.whitebox.fireworks.widgets`, and the widget cannot appear in the gallery, no
-matter what the code does.
+Registration alone is not proof of a working widget: on this Mac, `pluginkit`
+lists the ad-hoc extension. The installed widget has no App Group entitlement
+and its shared container does not exist. A distribution build must authorize
+`group.com.whitebox.fireworks` on both app and extension, then the running app
+must write a snapshot there. Only seeing that data drawn by the real widget
+proves the complete path works.
 
 The extension must also be sandboxed, and a sandboxed extension can only read a
 shared **App Group** — which is why the entitlements name
@@ -180,14 +180,23 @@ Not possible yet: this Mac has no **Developer ID Application** certificate
 (only Apple Development and Apple Distribution). Once it exists:
 
 ```bash
-codesign --deep --force --options runtime --sign "Developer ID Application: …" Fireworks.app
-ditto -c -k --keepParent Fireworks.app Fireworks.zip
-xcrun notarytool submit Fireworks.zip --keychain-profile notary --wait
-xcrun stapler staple Fireworks.app
-hdiutil create -volname Fireworks -srcfolder Fireworks.app -ov -format UDZO Fireworks.dmg
+Tools/release-dmg.sh --check
+Tools/release-dmg.sh
 ```
 
-Then a Homebrew cask pointing at the DMG.
+The script explicitly archives with Developer ID and hardened runtime, exports
+with the Developer ID provisioning profile, checks both App Group entitlements,
+and notarizes/staples the app **and final DMG**. It computes the SHA-256 only
+after stapling, then renders `Tools/fireworks.rb.in` into `build/fireworks.rb`.
+The template is intentionally not installable before a real artifact exists.
+Copy the generated cask to `Casks/fireworks.rb` in a tap only after publishing
+the matching DMG. These post-credential stages still require an end-to-end run;
+offline contract tests are not evidence of notarization.
+
+Use `xcrun notarytool store-credentials notary --apple-id <APPLE_ID> --team-id
+4QJ25Y85MX` in your own terminal, letting its secure prompt receive the
+app-specific password. Never put a password in a command or shell history.
+`xcrun notarytool history --keychain-profile notary` must then succeed.
 
 ## TestFlight
 

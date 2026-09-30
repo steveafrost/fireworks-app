@@ -34,9 +34,9 @@ settings:
   #             on any Mac with no Apple account, which is how the app is being
   #             developed and how it runs on this machine today. The bundle id is
   #             still stable, which is all notifications and the Keychain need.
-  #   Release — a real identity carrying the App Group entitlement. That is also
-  #             the only way an extension is registered with the plugin host, so
-  #             release signing is what makes the widget appear at all.
+  #   Release — a real identity carrying the App Group entitlement. This
+  #             authorizes the shared container the widget reads. Plugin
+  #             registration alone is not proof that a widget can draw live data.
   configs:
     Debug:
       CODE_SIGN_IDENTITY: "-"

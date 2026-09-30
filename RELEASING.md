@@ -29,6 +29,35 @@ Losing it means shipping a new public key inside the app — which only reaches
 people who already have the app if the *next* release is signed with the old key.
 Practically: keep the backup.
 
+## Notarized DMG release (preferred)
+
+Use `Tools/release-dmg.sh --check`, then `Tools/release-dmg.sh`. The script
+archives with Developer ID and hardened runtime, notarizes/staples the app and
+DMG, and writes the final cask to `build/fireworks.rb`. A missing certificate or
+notary credential stops it before building. Do not substitute an ad-hoc archive.
+
+Only after that script succeeds (replace `1.0` with the actual release version):
+
+```sh
+SPARKLE=build/dd/SourcePackages/artifacts/sparkle/Sparkle/bin
+xcrun stapler validate build/Fireworks-1.0.dmg
+"$SPARKLE/sign_update" --account ed25519 build/Fireworks-1.0.dmg
+mkdir -p build/publish
+cp build/Fireworks-1.0.dmg build/publish/
+"$SPARKLE/generate_appcast" --account ed25519 \
+  --download-url-prefix "https://github.com/steveafrost/fireworks-app/releases/download/v1.0/" \
+  -o build/publish/appcast.xml build/publish
+```
+
+Use a staging directory containing only verified release artifacts. The tools
+read the existing login-Keychain signing key; do not export or regenerate it.
+Publish the DMG, read back the release asset and verify its hash, then copy the
+staged appcast to `docs/appcast.xml` and publish the feed. Copy the generated
+cask to `Casks/fireworks.rb` in your tap. Until notarization succeeds, leave the
+feed empty: no fabricated signature, checksum, or placeholder release entry.
+For already-installed builds to receive an update, the release build number
+must be higher than theirs; a same-number first release will not be offered.
+
 ## Cutting a release
 
 1. **Bump the version.** Both numbers, in `project.yml`:
