@@ -20,6 +20,12 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- The app talks to Fireworks over HTTPS and nothing else, which is the exempt
+	     case. Declaring it here answers the export-compliance question at upload time
+	     instead of leaving the build in "Missing Compliance" where it cannot be
+	     submitted. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchScreen</key>

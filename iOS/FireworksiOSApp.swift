@@ -34,7 +34,10 @@ struct iOSRootView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    if let reading = model.reading, model.config.isAnchored {
+                    // The label comes first: everything under it is sample data, and that
+                    // has to be known before the figures are read rather than after.
+                    if model.isDemo, model.demoIsLabelled { DemoLabel() }
+                    if let reading = model.reading, model.showsReading {
                         CreditGauge(reading: reading, low: model.config.lowThreshold,
                                     critical: model.config.criticalThreshold, size: 150)
                             .frame(maxWidth: .infinity)

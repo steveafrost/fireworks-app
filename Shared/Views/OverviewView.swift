@@ -30,7 +30,10 @@ public struct OverviewView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Rhythm.section) {
-            if let reading = model.reading, model.config.isAnchored {
+            // The label comes first: everything under it is sample data, and that has to
+            // be known before the figures are read rather than after.
+            if model.isDemo, model.demoIsLabelled { DemoLabel() }
+            if let reading = model.reading, model.showsReading {
                 content(reading)
             } else {
                 SetupCard()
@@ -295,6 +298,7 @@ struct Banner: View {
 /// rather than asking for a figure it can look up.
 public struct SetupCard: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.colorScheme) private var scheme
     @State private var key = ""
     @State private var error: String?
     @State private var saved = false
@@ -341,6 +345,22 @@ public struct SetupCard: View {
                     .font(.system(size: 11))
                 Spacer(minLength: 0)
             }
+
+            // The way to see the app without deciding anything yet: an App Review
+            // reviewer has no key, and neither does someone reading the description.
+            // What it puts on screen is labelled everywhere it appears — see DemoLabel.
+            Button {
+                model.startDemo()
+            } label: {
+                Text("No key yet? ").foregroundStyle(.secondary)
+                    + Text("See a demo").foregroundStyle(Palette.accent(scheme))
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 11))
+            // A concatenated `Text` label reads as one accessibility element whose name
+            // is both halves, so the screenshot harness looks the button up by identifier
+            // rather than by a string it would have to keep in step with the copy.
+            .accessibilityIdentifier("see-demo")
         }
     }
 

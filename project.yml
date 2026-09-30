@@ -166,3 +166,48 @@ targets:
       configs:
         Release:
           CODE_SIGN_ENTITLEMENTS: Widgets/FireworksWidgets.entitlements
+
+  # ---------------------------------------------- iOS UI tests (screenshots)
+  # A UI test rather than a unit test, for two reasons: App Store screenshots have to
+  # come from the app running on a real device surface, and the one promise the demo
+  # makes — that it says the figures are not the account's — is a claim about what is
+  # drawn, which only this can check. The app is driven with DEBUG-only launch
+  # arguments (`--demo`, `--render-ui-sample`), so a shipped build has neither path.
+  FireworksiOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: iOSUITests
+    dependencies:
+      - target: FireworksiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.whitebox.fireworks.ios.uitests
+        TEST_TARGET_NAME: FireworksiOS
+        GENERATE_INFOPLIST_FILE: YES
+
+# Explicit schemes. Adding a `schemes:` key stops XcodeGen generating one per target, so
+# every scheme the release script drives has to be named here or a release fails with
+# "does not contain a scheme named FireworksiOS" — which is how this block came to exist.
+# `Fireworks` and `FireworksiOS` are the two `Tools/release-dmg.sh` archives and exports;
+# the UI test scheme is the reason any of this is spelled out.
+schemes:
+  Fireworks:
+    build:
+      targets:
+        Fireworks: all
+  FireworksiOS:
+    build:
+      targets:
+        FireworksiOS: all
+    test:
+      targets:
+        - FireworksiOSUITests
+  FireworksiOSUITests:
+    build:
+      targets:
+        FireworksiOS: all
+        FireworksiOSUITests: [test]
+    test:
+      targets:
+        - FireworksiOSUITests

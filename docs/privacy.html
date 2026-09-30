@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fireworks — Privacy</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0 auto; padding: 3rem 1.25rem 5rem; max-width: 38rem;
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color: #4c4f69; background: #eff1f5;
+  }
+  @media (prefers-color-scheme: dark) { body { color: #cdd6f4; background: #1e1e2e; } }
+  h1 { font-size: 1.6rem; margin: 0 0 .35rem; letter-spacing: -.01em; }
+  h2 { font-size: 1rem; margin: 2.25rem 0 .5rem; }
+  p, li { margin: .5rem 0; }
+  ul { padding-left: 1.1rem; }
+  .sub { opacity: .7; margin-top: 0; }
+  code { font-size: .9em; opacity: .85; }
+  a { color: #8839ef; }
+  @media (prefers-color-scheme: dark) { a { color: #cba6f7; } }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid currentColor; opacity: .55; font-size: .85rem; }
+</style>
+</head>
+<body>
+<h1>Fireworks — Privacy</h1>
+<p class="sub">The menu-bar and iOS apps for reading a Fireworks AI credit balance.</p>
+
+<p><strong>Short version:</strong> these apps have no server of their own, collect
+nothing about you, and send nothing anywhere except to Fireworks — with the API key
+you supplied, to read the balance and spending you asked to see.</p>
+
+<h2>What the app stores, and where</h2>
+<ul>
+  <li><strong>Your Fireworks API key</strong>, in the macOS or iOS Keychain. It is
+      never written to a plain file, never logged, and never sent anywhere except
+      Fireworks.</li>
+  <li><strong>The readings it has taken</strong> — balance, spend, daily totals — as a
+      small file on your device, so the app can show the last known figures
+      immediately at launch and keep showing them if Fireworks cannot be reached.</li>
+  <li><strong>Your settings</strong> — thresholds, refresh interval, whether alerts are
+      on.</li>
+</ul>
+
+<h2>What leaves your device</h2>
+<p>Requests to Fireworks (<code>api.fireworks.ai</code> and
+<code>gateway.fireworks.ai</code>), authenticated with your key, asking for your
+account's balance, invoices and usage. Those requests are governed by
+<a href="https://fireworks.ai/privacy-policy">Fireworks' own privacy policy</a>. The
+apps make no other network requests.</p>
+
+<h2>What the app does not do</h2>
+<ul>
+  <li>No analytics, telemetry, crash reporting or advertising SDKs.</li>
+  <li>No accounts, no sign-in, no server that sees your key or your numbers.</li>
+  <li>No tracking, no device identifiers, no third-party libraries that phone home.</li>
+  <li>Nothing is sold, shared, or transmitted to anyone but Fireworks.</li>
+</ul>
+
+<h2>Notifications</h2>
+<p>If you turn alerts on, they are generated and delivered on your own device. No
+notification content leaves it.</p>
+
+<h2>The widget</h2>
+<p>The widget reads the same local reading file, through an App Group shared between
+the app and its widget extension on your device. Nothing about it is transmitted.</p>
+
+<h2>Children</h2>
+<p>The apps are developer tools, not directed at children, and collect no personal
+information from anyone.</p>
+
+<h2>Removing your data</h2>
+<p>Deleting the app removes its stored readings and settings. The API key is removed
+when you delete it in the app, or with the Keychain entry
+<code>fireworks-app</code>. You can also revoke the key at any time in your
+<a href="https://app.fireworks.ai/settings/users/api-keys">Fireworks account</a>,
+which makes every copy of it useless.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, the change appears in this file's history in the public
+repository.</p>
+
+<h2>Contact</h2>
+<p>Questions or corrections: open an issue at
+<a href="https://github.com/steveafrost/fireworks-app/issues">github.com/steveafrost/fireworks-app</a>.</p>
+
+<footer>Last updated 30 September 2026. This page is served from the app's own
+repository.</footer>
+</body>
+</html>
