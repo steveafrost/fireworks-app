@@ -9,8 +9,8 @@
   signature and the length attributes are what the app checks, and a hand-typed
   item would simply be rejected. See RELEASING.md.
 
-  No releases yet, so the channel is empty and every copy of the app is up to
-  date — which is the correct thing for an empty feed to mean.
+  A release here is only offered to a copy whose CFBundleVersion is *lower* than
+  the sparkle:version below, so publishing 1.0 does not re-offer 1.0.
 -->
 <rss version="2.0"
      xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
@@ -20,5 +20,13 @@
     <link>https://steveafrost.github.io/fireworks-app/appcast.xml</link>
     <description>Fireworks — credit, on the menu bar</description>
     <language>en</language>
+    <item>
+      <title>1.0</title>
+      <pubDate>Wed, 30 Sep 2026 13:11:43 -0400</pubDate>
+      <sparkle:version>1</sparkle:version>
+      <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/steveafrost/fireworks-app/releases/download/v1.0/Fireworks-1.0.dmg" length="4105760" type="application/octet-stream" sparkle:edSignature="/OIRXnZ9jeqvXJtrVb4nKSf8zHfhEGs6BEySzhPGpzizH1Z7F6lN+5kK8q0BkHiPclBSlPna/E2WKEkvwV2EBw=="/>
+    </item>
   </channel>
 </rss>
