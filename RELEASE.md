@@ -173,20 +173,40 @@ build/Fireworks-1.0.dmg: accepted       (spctl, source=Notarized Developer ID)
 ```
 
 **One thing device registration did not do: enable the App Groups capability on
-the macOS App IDs.** Both Mac profiles carry only `application-identifier`,
+the macOS App IDs.** Both Mac profiles carried only `application-identifier`,
 `team-identifier` and `keychain-access-groups` — no `application-groups`. The
 entitlement is therefore *unauthorised*, which macOS tolerates in the signature
-and then refuses at runtime: the installed app's
-`containerURL(forSecurityApplicationGroupIdentifier:)` returns nil, so it writes
-to Application Support instead and the widget has nothing to read. The symptom
-reads like an app bug; the cause is a missing capability on the App ID.
+and then refuses at runtime: `containerURL(forSecurityApplicationGroupIdentifier:)`
+returns nil, so the app writes to Application Support instead and the widget has
+nothing to read. The symptom reads like an app bug; the cause is a missing
+capability on the App ID.
 
-So the last step is portal-side: **Identifiers → `com.whitebox.fireworks` (macOS)
-→ Capabilities → App Groups → Configure → `group.com.whitebox.fireworks`**, and
-the same for `com.whitebox.fireworks.widgets`. Then re-run the script: the
-profiles are regenerated with the group authorised, the container resolves, and
-the app writes the snapshot the widget draws. The Login Item (`SMAppService`)
-needs the same team-signed footing.
+Fixed by hand in the portal (2026-09-30): App Groups on both macOS App IDs with
+`group.com.whitebox.fireworks` assigned. The regenerated profiles then authorise
+it, and the installed app moved its data into the shared container on its next
+launch:
+
+```
+com.apple.security.application-groups => [ "group.com.whitebox.fireworks", "4QJ25Y85MX.*" ]
+launch: data=/Users/stevefrost/Library/Group Containers/group.com.whitebox.fireworks/Fireworks
+```
+
+**Verifying that is harder than it looks.** macOS 15+ protects app group
+containers from processes outside the group, so listing one fails with *"Operation
+not permitted"* — and with stderr suppressed that looks exactly like an empty
+container, which is the wrong conclusion to draw. Read the app's own os_log
+instead (it logs `launch: data=…` as public):
+
+```bash
+log show --predicate 'subsystem == "com.whitebox.fireworks"' --last 10m --style compact | grep -E "launch:|refresh:"
+```
+
+A signed probe works too: compile a small binary, sign it with
+`Mac/Fireworks.entitlements`, and `containerURL(…)` resolves — but enumeration is
+still denied, so a probe can prove authorisation, never contents. What proves the
+app can write is its own `isUsable` probe (create, write, remove), which is what
+chose the container in the first place. The Login Item (`SMAppService`) needs the
+same team-signed footing.
 
 ## Install the running app
 
