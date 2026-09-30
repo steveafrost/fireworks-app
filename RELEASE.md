@@ -86,20 +86,43 @@ upload payload.
    no credential leaves the GUI.
 3. TestFlight → internal testing group → install on the phone.
 
-## The Mac widget still needs one click
+## The Mac widget: what actually blocks it
 
-The macOS Release build fails with:
+Not registration, as this file used to say. On macOS 27 the extension *is*
+registered by LaunchServices even from the ad-hoc build:
 
 ```
-error: Device "F12057 Laptop" isn't registered in your developer account. The
-device must be registered in order to be included in a provisioning profile.
+$ pluginkit -m -A -D -v -i com.whitebox.fireworks.widgets
+     com.whitebox.fireworks.widgets(1.0)  …  /Applications/Fireworks.app/Contents/PlugIns/FireworksWidgets.appex
 ```
 
-A Mac build needs a *Mac* development profile, and that needs this Mac registered
-as a device. Registering is an account action: Xcode → the Fireworks target →
-Signing & Capabilities → tick *Automatically manage signing* (it registers the
-machine), or add it under developer.apple.com → Devices. The Login Item
-(`SMAppService`) has the same requirement, so it is left out until then.
+What it cannot do is *read anything*. The widget draws from the App Group
+container, and an ad-hoc signed app cannot create one:
+
+```
+$ ls ~/Library/Group\ Containers/group.com.whitebox.fireworks/
+(no group container — an ad-hoc app cannot create one)
+```
+
+`codesign -d --entitlements - FireworksWidgets.appex` confirms why: the ad-hoc
+build carries `app-sandbox` and `get-task-allow` and no
+`application-groups` entitlement, because no provisioning profile authorises it.
+So the widget either does not appear in the gallery or appears and draws its
+empty state.
+
+The fix is the same piece of account work as distribution, and the
+**Developer ID route needs no device registration** — Developer ID provisioning
+profiles are not device-limited, unlike a Mac *development* profile:
+
+```bash
+Tools/release-dmg.sh --check     # names exactly what is missing
+Tools/release-dmg.sh             # archive → sign → notarize → staple → DMG → cask stanza
+```
+
+Registering this Mac as a device is only needed to make a *development* build
+team-signed (Xcode → the Fireworks target → Signing & Capabilities → tick
+*Automatically manage signing*). The Login Item (`SMAppService`) has the same
+requirement, so it stays out until one of the two is done.
 
 ## Install the running app
 
