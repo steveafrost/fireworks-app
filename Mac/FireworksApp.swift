@@ -14,10 +14,16 @@ struct FireworksApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            OverviewView(onOpenSettings: { openSettings() })
+            OverviewView(onOpenSettings: { presentSettings() })
                 .environment(model)
         } label: {
             MenuBarLabel(model: model)
+                // Lets the app open its own settings window on request, which is
+                // the only way to get that window on screen without a click: see
+                // `--open-settings` in the app delegate.
+                .onReceive(NotificationCenter.default.publisher(for: .fireworksShowSettings)) { _ in
+                    presentSettings()
+                }
         }
         .menuBarExtraStyle(.window)
 
@@ -31,6 +37,59 @@ struct FireworksApp: App {
     /// but `openSettings` is only available inside a Scene, so it lives here and
     /// is handed to the popover as a closure.
     @Environment(\.openSettings) private var openSettings
+
+    /// What SwiftUI autosaves the Settings window's frame under, and therefore the
+    /// only name it has that can be matched from outside SwiftUI.
+    static let settingsWindowName = "com_apple_SwiftUI_Settings_window"
+
+    /// Show the settings window, in front.
+    ///
+    /// The app is an accessory (`LSUIElement`): no Dock icon, no menu bar of its
+    /// own, and it does not become active by itself. So `openSettings()` alone
+    /// creates the window *behind* whatever is frontmost — it opens and is
+    /// immediately buried, which is exactly what it did. Activating first is not
+    /// enough either, because the window does not exist yet when the action
+    /// returns.
+    ///
+    /// Hence three passes. What one pass measures on this Mac: at +0.2s the window
+    /// exists, but it is neither key nor is the app active — `found=true key=false
+    /// active=false`. A later pass, once the window has been on screen for a
+    /// moment, does raise it (`key=true active=true`). So the passes repeat until
+    /// that is true, and the last one reports either way, because the result cannot
+    /// be seen: Screen Recording is denied here, so nobody can screenshot whether
+    /// the window ended up in front of or behind the app that had focus.
+    private func presentSettings() {
+        NSApp.activate()
+        openSettings()
+        let delays: [Double] = [0.15, 0.45, 0.9]
+        for delay in delays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard let settings = NSApp.windows.first(where: {
+                    $0.frameAutosaveName == Self.settingsWindowName
+                }) else { return }
+                // `orderFrontRegardless` is the part that actually guarantees what
+                // was asked for: it puts the window in front even when another app
+                // holds the focus, which plain activation does not do for an app
+                // with no Dock icon. Activation is still asked for, so the window
+                // takes keystrokes rather than just being visible.
+                settings.orderFrontRegardless()
+                settings.makeKey()
+                NSApp.activate(ignoringOtherApps: true)
+                let raised = NSApp.isActive && settings.isKeyWindow
+                if raised || delay == delays.last {
+                    Diagnostics.log("settings: presented key=\(settings.isKeyWindow) "
+                                    + "active=\(NSApp.isActive) after=\(delay)s")
+                }
+            }
+        }
+    }
+}
+
+extension Notification.Name {
+    /// Asks the running app to present its settings window. Exists so the app can
+    /// open its own settings on demand (`--open-settings`), which is the only way
+    /// to measure that window on a machine where a script cannot click anything.
+    static let fireworksShowSettings = Notification.Name("com.whitebox.fireworks.showSettings")
 }
 
 @MainActor
@@ -49,15 +108,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if CommandLine.arguments.contains("--open-settings") {
-            // A script cannot open an accessory app's Settings window — there is no
-            // menu bar to click and no AppleScript command for it — so the only way
-            // to measure that window is to have the app open it. WindowSizeProbe
-            // logs what it measures; both selectors are sent because the SwiftUI
-            // one was renamed between macOS releases.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                NSApp.activate(ignoringOtherApps: true)
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+            // A script cannot open an accessory app's Settings window: there is no
+            // menu bar to click and no AppleScript command for it, and
+            // NSApp.sendAction(showSettingsWindow:) does nothing here. So the app
+            // opens it for itself — which is what makes that window measurable from
+            // a script at all (see SettingsSizeProbe).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                NotificationCenter.default.post(name: .fireworksShowSettings, object: nil)
             }
         }
         Task { await AppModel.shared.start() }
