@@ -230,6 +230,17 @@ public struct SettingsView: View {
     private var updateSection: some View {
         Section("Updates") {
             if updater.isAvailable {
+                if let available = updater.available {
+                    // An update found in the background is offered here as well as
+                    // in the notification: notifications can be denied, and this
+                    // row is the signal that cannot be.
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Version \(available) is available")
+                            .font(.system(size: 11))
+                        Spacer(minLength: 8)
+                        Button("Install…") { updater.checkForUpdates() }
+                    }
+                }
                 Toggle("Check for updates automatically", isOn: Binding(
                     get: { updater.automaticallyChecks },
                     set: { updater.automaticallyChecks = $0 }

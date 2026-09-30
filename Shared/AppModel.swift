@@ -36,7 +36,7 @@ public final class AppModel {
 
     /// Sparkle, on the platform that has it. Owned by the model so the app
     /// delegate and the Settings pane drive the same updater.
-    public let updater = Updater()
+    public let updater = Updater.shared
 
     public init() {
         SharedContainer.prepare()

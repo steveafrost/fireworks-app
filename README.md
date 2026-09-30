@@ -38,13 +38,15 @@ yet — the balance alone is enough to stop guessing.
 |---|---|
 | `Core/` | Swift package: the whole engine, no UI, no third-party dependencies |
 | `Core/Sources/FireworksCore/` | API client, balance gateway call, config, anchor math, day series, alert planning, key handling |
-| `Core/Tests/FireworksCoreTests/` | 68 tests, no network, no simulator (`swift test`) |
+| `Core/Tests/FireworksCoreTests/` | 73 tests, no network, no simulator (`swift test`) |
 | `project.yml` | XcodeGen spec for the app + widget targets (the `.xcodeproj` is generated, never committed) |
 | `Mac/` | menu-bar app (no Dock icon, popover UI) |
 | `iOS/` | iPhone/iPad app |
 | `Shared/` | the app-side half: `AppModel`, notifications, diagnostics, views |
 | `Widgets/` | WidgetKit extensions for both platforms |
 | `RELEASE.md` | signing, App Group, notarization, TestFlight |
+| `docs/appcast.xml` | the update feed the app reads (GitHub Pages, `docs/`) |
+| `RELEASING.md` | how to cut an update: bump, archive, sign, generate the feed |
 
 One engine, three surfaces. Nothing about "what the number is" is allowed to
 exist twice, which is why the engine has no AppKit/UIKit/SwiftUI import: the Mac
@@ -95,12 +97,20 @@ Signed with the Developer ID and notarized, shipped as a DMG and a Homebrew cask
 No sandbox on the Mac build (it reads a key from the Keychain and talks to one
 API); the iOS build is App Store-bound and sandboxed, as iOS requires.
 
+The Mac app also updates itself, through [Sparkle](https://sparkle-project.org/):
+it reads `docs/appcast.xml`, and verifies each release against the Ed25519 key in
+`Mac/Info.plist` before offering it. Daily checks are on by default and can be
+turned off in Settings → Updates. [RELEASING.md](RELEASING.md) is the runbook,
+including where the signing key lives and why it needs backing up.
+
 ## Status
 
 - [x] Engine: client, config, anchor math, day series, alerts, Keychain, snapshots
-- [x] 45 engine tests (`swift test`)
+- [x] 73 engine tests (`swift test`)
 - [x] Mac menu-bar app (running on a real Mac against the live API)
 - [x] Notifications via `UNUserNotificationCenter`
+- [x] Self-updating via Sparkle: feed live on GitHub Pages, offer path verified
+      from a 1.0 copy against a 1.1 feed, quiet by default (no window raised)
 - [x] WidgetKit extension written and embedded for macOS and iOS
 - [x] iOS app target written
 - [x] iOS app builds, launches and measures (verified in the simulator against

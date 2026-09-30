@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import FireworksCore
+import UserNotifications
 #if canImport(Sparkle)
 import Sparkle
 #endif
@@ -31,6 +32,11 @@ public final class Updater: ObservableObject {
     @Published public private(set) var lastCheck: Date?
     @Published public private(set) var canCheck = false
 
+    /// The version string of an update Sparkle has found but that has not been
+    /// installed yet, so Settings can offer it without the user having to go
+    /// looking. Cleared when the user gives it attention or the session ends.
+    @Published public private(set) var available: String?
+
     /// The feed this build would read, for Settings to show.
     public var feedURL: URL? { UpdateFeed.url(in: Bundle.main.infoDictionary ?? [:]) }
 
@@ -45,8 +51,16 @@ public final class Updater: ObservableObject {
 
     #if canImport(Sparkle)
     private var controller: SPUStandardUpdaterController?
+    /// Held here because Sparkle keeps only a weak reference to its user driver
+    /// delegate, and an update found while nobody is looking must not be lost to
+    /// a deallocated reminder.
+    private let reminders = UpdateReminders()
     #endif
     private var observers: [AnyCancellable] = []
+
+    /// One per process, because a Sparkle user driver delegate has to be able to
+    /// reach the updater that Sparkle itself is driving.
+    public static let shared = Updater()
 
     public init() {
         #if canImport(Sparkle)
@@ -64,7 +78,7 @@ public final class Updater: ObservableObject {
         guard controller == nil else { return }
         let controller = SPUStandardUpdaterController(startingUpdater: true,
                                                       updaterDelegate: nil,
-                                                      userDriverDelegate: nil)
+                                                      userDriverDelegate: reminders)
         self.controller = controller
         let updater = controller.updater
         automaticallyChecks = updater.automaticallyChecksForUpdates
@@ -97,4 +111,85 @@ public final class Updater: ObservableObject {
         controller?.checkForUpdates(nil)
         #endif
     }
+
+    // MARK: - gentle reminders
+
+    /// Sparkle found an update. `showNow` says whether it is being put in front of
+    /// the user already; when it is not, the reminder is what carries the news.
+    func noteUpdate(version: String, showNow: Bool) {
+        Diagnostics.log("update: found version=\(version) shownNow=\(showNow)")
+        available = version
+        guard !showNow else { return }
+        postReminder(version: version)
+    }
+
+    /// The user has seen it, dismissed it, or the session ended.
+    func noteUpdateSettled() {
+        Diagnostics.log("update: settled")
+        available = nil
+    }
+
+    /// Best-effort by design: if notifications are not allowed, nothing is posted
+    /// and the update still shows up in Settings, which is the durable signal.
+    private func postReminder(version: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Fireworks \(version) is available"
+        content.body = "Open Fireworks ▸ Settings ▸ Updates to install it."
+        content.sound = .default
+        // Same identifier every time, so a daily check replaces its own reminder
+        // instead of stacking a new one behind the last.
+        let request = UNNotificationRequest(identifier: "fireworks.update",
+                                            content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
 }
+
+#if canImport(Sparkle)
+/// Sparkle's standard user driver, made gentle.
+///
+/// A menu-bar app is a background app, and Sparkle says as much at launch:
+/// "Background app automatically schedules for update checks but does not
+/// implement gentle reminders. As a result, users may not take notice to update
+/// alerts that show up in the background." Both halves of that are real — an
+/// update window raised over whatever someone was doing, or an alert nobody ever
+/// sees — so this is the documented answer to it: Sparkle takes the focus when it
+/// already has the user's attention, and otherwise the reminder does the telling.
+///
+/// `MainActor.assumeIsolated` is a statement of fact rather than a shortcut:
+/// Sparkle's user driver is a main-thread object and calls these from the main
+/// thread. The class is separate from `Updater` because the protocol is
+/// Objective-C and nonisolated, which a `@MainActor` type cannot satisfy directly.
+final class UpdateReminders: NSObject, SPUStandardUserDriverDelegate {
+    var supportsGentleScheduledUpdateReminders: Bool { true }
+
+    func standardUserDriverShouldHandleShowingScheduledUpdate(_ update: SUAppcastItem,
+                                                             andInImmediateFocus immediateFocus: Bool) -> Bool {
+        // True only when Sparkle would bring the alert into immediate focus — the
+        // app was just launched, or the Mac has been idle. Otherwise this returns
+        // false and `standardUserDriverWillHandleShowingUpdate` below is handed the
+        // job, instead of a window appearing behind the user's work.
+        immediateFocus
+    }
+
+    func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool,
+                                                   forUpdate update: SUAppcastItem,
+                                                   state: SPUUserUpdateState) {
+        let version = update.displayVersionString
+        let userInitiated = state.userInitiated
+        MainActor.assumeIsolated {
+            // A check the user asked for always has its own window; there is
+            // nothing to remind them about.
+            guard !userInitiated else { return }
+            Updater.shared.noteUpdate(version: version, showNow: handleShowingUpdate)
+        }
+    }
+
+    func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
+        MainActor.assumeIsolated { Updater.shared.noteUpdateSettled() }
+    }
+
+    func standardUserDriverWillFinishUpdateSession() {
+        MainActor.assumeIsolated { Updater.shared.noteUpdateSettled() }
+    }
+}
+#endif
