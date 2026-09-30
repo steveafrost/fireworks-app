@@ -219,7 +219,10 @@ public final class AppModel {
         guard let reading else {
             switch status {
             case .needsKey(let reason): return reason
-            case .needsAnchor: return "Waiting for the first balance from Fireworks"
+            case .needsAnchor:
+                return keySource.isEmpty
+                    ? "Paste your Fireworks API key to fetch your first balance"
+                    : "Waiting for the first balance from Fireworks"
             default: return "No reading yet"
             }
         }

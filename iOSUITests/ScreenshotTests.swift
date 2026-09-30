@@ -78,6 +78,14 @@ final class ScreenshotTests: XCTestCase {
         let app = launch([])
         XCTAssertTrue(app.staticTexts["Your key is the whole setup"].waitForExistence(timeout: 30),
                       "an unconfigured app shows the setup card")
+        let setupInstruction = "Paste your Fireworks API key to fetch your first balance"
+        let setupHints = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", setupInstruction))
+        XCTAssertTrue(setupHints.firstMatch.waitForExistence(timeout: 10),
+                      "setup must say what the key is for")
+        XCTAssertEqual(setupHints.count, 1,
+                       "setup must not repeat the same instruction in the footer")
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Waiting for the first balance from Fireworks")).count, 0,
+                       "setup must not imply that a balance request is already underway")
         XCTAssertTrue(app.buttons["see-demo"].exists, "the way to look before deciding")
         capture("03-setup")
     }

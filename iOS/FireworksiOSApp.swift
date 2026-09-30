@@ -65,9 +65,11 @@ struct iOSRootView: View {
                         SetupCard()
                     }
                     HStack {
-                        Text(model.freshnessText())
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        if showsFreshness {
+                            Text(model.freshnessText())
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                         Spacer()
                         Button {
                             Task { await model.refresh() }
@@ -97,6 +99,12 @@ struct iOSRootView: View {
                 }
             }
         }
+    }
+
+    private var showsFreshness: Bool {
+        if model.reading != nil { return true }
+        if case .needsAnchor = model.status, model.keySource.isEmpty { return false }
+        return true
     }
 
     @ViewBuilder

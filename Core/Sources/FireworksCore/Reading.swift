@@ -271,13 +271,13 @@ public struct Reading: Codable, Sendable, Equatable {
         models.filter { $0.value >= floor }.sorted { $0.value > $1.value }.map { ($0.key, $0.value) }
     }
 
-    /// A short, human model name for a narrow column.
+    /// A human model name with service prefixes removed. The view owns truncation
+    /// because the available width differs between the phone, the popover and a
+    /// settings/help surface.
     public static func shortModel(_ name: String) -> String {
         var text = name
         if let range = text.range(of: "models/") { text = String(text[range.upperBound...]) }
-        text = text.replacingOccurrences(of: "accounts/fireworks/", with: "")
-        if text.count > 16 { text = String(text.prefix(15)) + "…" }
-        return text
+        return text.replacingOccurrences(of: "accounts/fireworks/", with: "")
     }
 }
 

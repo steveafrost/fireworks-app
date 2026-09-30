@@ -315,7 +315,7 @@ public struct SetupCard: View {
                     .foregroundStyle(.secondary)
                 Text("Your key is the whole setup")
                     .font(.system(size: 15, weight: .semibold))
-                Text("The balance, the credit it was bought with and the spending that has come off it are all read from Fireworks with your key. Nothing to type in, and nothing to keep up to date: the first figure arrives a moment after you paste it.")
+                Text("Paste your Fireworks API key to fetch your first balance. The credit and spending figures are read from Fireworks too, so there is nothing else to type in or keep up to date.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
