@@ -117,10 +117,22 @@ public enum UISnapshot {
                 .padding(Rhythm.inset)
                 .frame(width: Rhythm.width, alignment: .leading)),
              CGSize(width: 340, height: 430)),
-            // No settings panel here: it is a `Form`, and the offscreen renderer
+            // No settings *pane* here: it is a `Form`, and the offscreen renderer
             // draws one as nothing at all. A blank image is worse than no image —
             // it reads as a broken pane. The account hint is a Core function
             // covered by a test instead.
+            //
+            // The settings *sidebar* is different, and is worth a picture: it is a
+            // list of rows, so it renders, and it is the one place where a mistake
+            // is silent — an SF Symbol name that does not resolve draws an empty
+            // gap, which no assertion here can catch. Badges are drawn with a
+            // version in the update slot so both kinds appear.
+            ("settings-sidebar", AnyView(VStack(alignment: .leading, spacing: 7) {
+                ForEach(SettingsPane.allCases) { item in
+                    SettingsSidebarRow(pane: item, reading: model.reading, availableUpdate: "1.1")
+                }
+            }
+            .padding(12)), CGSize(width: 210, height: 200)),
             ("probe", AnyView(probe), CGSize(width: 340, height: 340))
         ]
     }

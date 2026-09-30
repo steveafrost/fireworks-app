@@ -38,7 +38,7 @@ yet — the balance alone is enough to stop guessing.
 |---|---|
 | `Core/` | Swift package: the whole engine, no UI, no third-party dependencies |
 | `Core/Sources/FireworksCore/` | API client, balance gateway call, config, anchor math, day series, alert planning, key handling |
-| `Core/Tests/FireworksCoreTests/` | 73 tests, no network, no simulator (`swift test`) |
+| `Core/Tests/FireworksCoreTests/` | 76 tests, no network, no simulator (`swift test`) |
 | `project.yml` | XcodeGen spec for the app + widget targets (the `.xcodeproj` is generated, never committed) |
 | `Mac/` | menu-bar app (no Dock icon, popover UI) |
 | `iOS/` | iPhone/iPad app |
@@ -106,8 +106,10 @@ including where the signing key lives and why it needs backing up.
 ## Status
 
 - [x] Engine: client, config, anchor math, day series, alerts, Keychain, snapshots
-- [x] 73 engine tests (`swift test`)
+- [x] 76 engine tests (`swift test`)
 - [x] Mac menu-bar app (running on a real Mac against the live API)
+- [x] Settings as a sidebar of six panes (Account, Balance, Alerts, General,
+      Updates, About) instead of one flat list of sections
 - [x] Notifications via `UNUserNotificationCenter`
 - [x] Self-updating via Sparkle: feed live on GitHub Pages, offer path verified
       from a 1.0 copy against a 1.1 feed, quiet by default (no window raised)

@@ -1,11 +1,21 @@
 import SwiftUI
 import FireworksCore
 
-/// Settings, including the two things the app cannot measure for you: the key and
-/// the starting balance.
+/// Settings, as a sidebar and a pane.
 ///
-/// The anchor section states plainly that setting a balance re-stamps the anchor
-/// to *now*, because the subtraction is only honest if both numbers refer to the
+/// It was one flat `Form` — key, balance, alerts, behaviour, about — and the
+/// problem with that was not length but adjacency: the key and the balance are
+/// one concern (the account) split across sections one and two, while "Behaviour"
+/// held the refresh cadence, the history length and the account-id override
+/// together. The panes below are the same settings, sorted by what you would be
+/// trying to do when you opened the window.
+///
+/// Two panes carry a badge, and only two, because a badge is a claim: Balance
+/// shows the figure the app measured, Updates shows a version it has actually
+/// been offered. The rest have nothing true to put there.
+///
+/// The anchor pane states plainly that setting a balance re-stamps the anchor to
+/// *now*, because the subtraction is only honest if both numbers refer to the
 /// same moment: a top-up that arrives without a new anchor makes the remaining
 /// figure read too low, and that is the one direction of error worth being loud
 /// about.
@@ -13,6 +23,7 @@ public struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.colorScheme) private var scheme
 
+    @State private var pane: SettingsPane = .balance
     @State private var key = ""
     @State private var keyMessage: String?
     @State private var balance = ""
@@ -27,32 +38,129 @@ public struct SettingsView: View {
     public init() {}
 
     public var body: some View {
-        Form {
-            keySection
-            anchorSection
-            alertSection
-            behaviourSection
-            updateSection
-            aboutSection
+        Group {
+            #if os(macOS)
+            split
+            #else
+            // iOS presents this in a sheet, where a sidebar would be a second
+            // navigation for one job. Same sections, one list.
+            Form { allSections }
+                .formStyle(.grouped)
+                .frame(minWidth: 440, minHeight: 560)
+            #endif
         }
-        .formStyle(.grouped)
-        .frame(minWidth: 440, minHeight: 560)
-        .task {
-            balance = model.config.anchorBalance > 0 ? String(format: "%.2f", model.config.anchorBalance) : ""
-            anchorDate = model.config.anchorTime ?? Date()
-            let status = await Notifier().currentAuthorization()
-            notifyStatus = switch status {
-            case .authorized, .provisional, .ephemeral: "Notifications are allowed"
-            case .denied: "Notifications are denied — allow them in System Settings › Notifications › Fireworks"
-            case .notDetermined: "You'll be asked the first time an alert fires"
-            @unknown default: nil
+        .task { await load() }
+    }
+
+    // MARK: - the window
+
+    #if os(macOS)
+    private var split: some View {
+        NavigationSplitView {
+            List(selection: $pane) {
+                ForEach(SettingsPane.allCases) { item in
+                    SettingsSidebarRow(pane: item,
+                                       reading: model.reading,
+                                       availableUpdate: updater.available)
+                        .tag(item)
+                }
             }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 170, ideal: 196, max: 230)
+        } detail: {
+            detail
+        }
+        .frame(minWidth: 700, minHeight: 520)
+    }
+
+    /// A pane is a title, a line saying what it is for, and its sections — the
+    /// same grouped list as before, one screenful at a time.
+    private var detail: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pane.title)
+                    .font(.system(size: 15, weight: .semibold))
+                Text(pane.subtitle)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 6)
+
+            Form {
+                switch pane {
+                case .account: accountSection; accountIDSection
+                case .balance: balanceStatusSection; liveBalanceSection; anchorSection
+                case .alerts: alertSection
+                case .general: generalSection
+                case .updates: updateSection
+                case .about: aboutSection
+                }
+            }
+            .formStyle(.grouped)
+        }
+    }
+    #endif
+
+    @ViewBuilder
+    private var allSections: some View {
+        accountSection
+        accountIDSection
+        balanceStatusSection
+        liveBalanceSection
+        anchorSection
+        alertSection
+        generalSection
+        updateSection
+        aboutSection
+    }
+
+    private func load() async {
+        balance = model.config.anchorBalance > 0 ? String(format: "%.2f", model.config.anchorBalance) : ""
+        anchorDate = model.config.anchorTime ?? Date()
+        let status = await Notifier().currentAuthorization()
+        notifyStatus = switch status {
+        case .authorized, .provisional, .ephemeral: "Notifications are allowed"
+        case .denied: "Notifications are denied — allow them in System Settings › Notifications › Fireworks"
+        case .notDetermined: "You'll be asked the first time an alert fires"
+        @unknown default: nil
         }
     }
 
     // MARK: - sections
 
-    private var keySection: some View {
+    /// The figure itself, so the pane that explains the number starts with it.
+    private var balanceStatusSection: some View {
+        Section {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if let reading = model.reading {
+                    Text(Money.formatted(reading.remaining))
+                        .font(.system(size: 26, weight: .semibold))
+                        .monospacedDigit()
+                    Text(reading.sourceWord.uppercased())
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.quaternary, in: Capsule())
+                } else {
+                    Text("No reading yet").foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Button("Refresh") {
+                    Task { await model.refresh() }
+                }
+            }
+            if let reading = model.reading {
+                Text(reading.footnote())
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var accountSection: some View {
         Section("API key") {
             HStack {
                 SecureField("paste a key", text: $key)
@@ -78,8 +186,34 @@ public struct SettingsView: View {
         }
     }
 
-    private var anchorSection: some View {
-        Section("Balance") {
+    private var accountIDSection: some View {
+        Section("Account") {
+            HStack {
+                TextField("Account (optional)", text: Binding(
+                    get: { model.config.account },
+                    set: { value in model.update { $0.account = value } }
+                ))
+                .textFieldStyle(.roundedBorder)
+                Button("Detect") {
+                    Task { await model.refresh() }
+                }
+            }
+            // The field reads like a second key until the note says otherwise, and
+            // it is not one — blank is the normal setting. The id the app worked out
+            // is shown here rather than written into the field, so the field stays
+            // empty and the app keeps asking the key. The wording lives in Core so
+            // it can be tested; this pane is a Form, which the offscreen renderer
+            // draws as nothing, so a picture is not available for it.
+            Text(FireworksConfig.accountHint(configured: model.config.account,
+                                             resolved: model.account))
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var liveBalanceSection: some View {
+        Section("Balance source") {
             Toggle("Ask Fireworks for the real balance", isOn: Binding(
                 get: { model.config.liveBalance },
                 set: { value in model.update { $0.liveBalance = value } }
@@ -88,6 +222,11 @@ public struct SettingsView: View {
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var anchorSection: some View {
+        Section("Anchor") {
             HStack {
                 Text("Balance held")
                 Spacer()
@@ -182,8 +321,8 @@ public struct SettingsView: View {
         }
     }
 
-    private var behaviourSection: some View {
-        Section("Behaviour") {
+    private var generalSection: some View {
+        Section("Refresh & history") {
             Picker("Refresh every", selection: Binding(
                 get: { model.config.refreshSeconds },
                 set: { value in model.update { $0.refreshSeconds = value } }
@@ -204,26 +343,15 @@ public struct SettingsView: View {
                 }
             }
             HStack {
-                TextField("Account (optional)", text: Binding(
-                    get: { model.config.account },
-                    set: { value in model.update { $0.account = value } }
-                ))
-                .textFieldStyle(.roundedBorder)
-                Button("Detect") {
+                Button("Refresh now") {
                     Task { await model.refresh() }
                 }
+                if let reading = model.reading {
+                    Text(reading.footnote())
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
             }
-            // The field reads like a second key until the note says otherwise, and
-            // it is not one — blank is the normal setting. The id the app worked out
-            // is shown here rather than written into the field, so the field stays
-            // empty and the app keeps asking the key. The wording lives in Core so
-            // it can be tested; this pane is a Form, which the offscreen renderer
-            // draws as nothing, so a picture is not available for it.
-            Text(FireworksConfig.accountHint(configured: model.config.account,
-                                             resolved: model.account))
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -287,6 +415,10 @@ public struct SettingsView: View {
                     Task { await model.refresh() }
                 }
             }
+            Text("Credit is measured by asking Fireworks for its rated cost per local day; the balance is read from the account gateway. Nothing here is estimated unless the gateway cannot be reached, and the popover says so when that happens.")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -328,5 +460,31 @@ extension Bundle {
         let version = infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let build = infoDictionary?["CFBundleVersion"] as? String ?? "—"
         return "\(version) (\(build))"
+    }
+}
+
+/// One row of the settings sidebar.
+///
+/// Pulled out of the `List` for one reason: the offscreen renderer can draw this
+/// (it is a row, not a `Form`) and it is where the mistakes that no test can see
+/// live — an SF Symbol name that resolves to nothing draws an empty space where an
+/// icon should be, and nothing about the code looks wrong.
+struct SettingsSidebarRow: View {
+    let pane: SettingsPane
+    let reading: Reading?
+    let availableUpdate: String?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label(pane.title, systemImage: pane.symbol)
+            Spacer(minLength: 8)
+            if let badge = SettingsPane.badge(for: pane, reading: reading,
+                                              availableUpdate: availableUpdate) {
+                Text(badge)
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
