@@ -55,22 +55,45 @@ public struct SettingsView: View {
     // MARK: - the window
 
     #if os(macOS)
+    /// A fixed sidebar and a pane, hand-built rather than a `NavigationSplitView`.
+    ///
+    /// `NavigationSplitView` brings a collapse control in the toolbar, a draggable
+    /// divider and a saved column width — three ways for the window to end up in a
+    /// state nobody asked for, and none of them wanted: six short panes do not
+    /// need to be collapsible. Building the row also means the selected one can be
+    /// the app's own purple, which the system's list selection will not be.
     private var split: some View {
-        NavigationSplitView {
-            List(selection: $pane) {
-                ForEach(SettingsPane.allCases) { item in
-                    SettingsSidebarRow(pane: item,
-                                       reading: model.reading,
-                                       availableUpdate: updater.available)
-                        .tag(item)
-                }
-            }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 170, ideal: 196, max: 230)
-        } detail: {
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
             detail
         }
-        .frame(minWidth: 700, minHeight: 520)
+        // Narrow on purpose: the window was sized to the popover's content, and a
+        // wider frame only stretches each row's label away from its value. The
+        // ideal is what the window opens at; the minimum is what the widest row
+        // (Alerts, with its two text fields) still needs.
+        .frame(minWidth: 560, idealWidth: 600, minHeight: 460)
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(SettingsPane.allCases) { item in
+                Button {
+                    pane = item
+                } label: {
+                    SettingsSidebarRow(pane: item,
+                                       reading: model.reading,
+                                       availableUpdate: updater.available,
+                                       selected: item == pane,
+                                       scheme: scheme)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(8)
+        .frame(width: 176, alignment: .top)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Palette.raised(scheme))
     }
 
     /// A pane is a title, a line saying what it is for, and its sections — the
@@ -84,9 +107,9 @@ public struct SettingsView: View {
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 6)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
 
             Form {
                 switch pane {
@@ -465,7 +488,7 @@ extension Bundle {
 
 /// One row of the settings sidebar.
 ///
-/// Pulled out of the `List` for one reason: the offscreen renderer can draw this
+/// Pulled out of the sidebar for one reason: the offscreen renderer can draw this
 /// (it is a row, not a `Form`) and it is where the mistakes that no test can see
 /// live — an SF Symbol name that resolves to nothing draws an empty space where an
 /// icon should be, and nothing about the code looks wrong.
@@ -473,18 +496,35 @@ struct SettingsSidebarRow: View {
     let pane: SettingsPane
     let reading: Reading?
     let availableUpdate: String?
+    var selected = false
+    var scheme: ColorScheme = .light
 
     var body: some View {
         HStack(spacing: 8) {
             Label(pane.title, systemImage: pane.symbol)
+                .fontWeight(selected ? .medium : .regular)
             Spacer(minLength: 8)
             if let badge = SettingsPane.badge(for: pane, reading: reading,
                                               availableUpdate: availableUpdate) {
                 Text(badge)
                     .font(.system(size: 11))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(selected ? selectedInk : Color.secondary)
             }
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .foregroundStyle(selected ? selectedInk : Color.primary)
+        .background(selected ? Palette.accent(scheme) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 6))
+        // The whole row is the target, not just the glyphs in it.
+        .contentShape(Rectangle())
+    }
+
+    /// Mocha's accent is a light lavender, so white on it would be unreadable —
+    /// the selected row takes the surface colour as its ink in dark mode, which is
+    /// the same trick the palette uses elsewhere.
+    private var selectedInk: Color {
+        scheme == .dark ? Palette.surface(.dark) : .white
     }
 }

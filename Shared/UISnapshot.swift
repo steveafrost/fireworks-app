@@ -61,7 +61,7 @@ public enum UISnapshot {
         let schemes: [ColorScheme] = wantsDark ? [.light, .dark] : [.light]
         var written: [String] = []
         for scheme in schemes {
-            for (name, view, size) in panels(model: model) {
+            for (name, view, size) in panels(model: model, scheme: scheme) {
                 // The opaque backdrop is load-bearing: `ImageRenderer` composites onto
                 // a transparent canvas, and text drawn straight onto it comes out
                 // blank — text inside a view that has its own fill survives, which is
@@ -102,7 +102,7 @@ public enum UISnapshot {
     }
 
     @MainActor
-    private static func panels(model: AppModel) -> [(String, AnyView, CGSize)] {
+    private static func panels(model: AppModel, scheme: ColorScheme) -> [(String, AnyView, CGSize)] {
         // Heights are deliberately generous. A fixed frame *smaller* than the
         // content makes SwiftUI compress the flexible rows — the text-only ones —
         // to nothing, which looks exactly like a layout bug in the app. The real
@@ -127,12 +127,15 @@ public enum UISnapshot {
             // is silent — an SF Symbol name that does not resolve draws an empty
             // gap, which no assertion here can catch. Badges are drawn with a
             // version in the update slot so both kinds appear.
-            ("settings-sidebar", AnyView(VStack(alignment: .leading, spacing: 7) {
+            ("settings-sidebar", AnyView(VStack(alignment: .leading, spacing: 2) {
                 ForEach(SettingsPane.allCases) { item in
-                    SettingsSidebarRow(pane: item, reading: model.reading, availableUpdate: "1.1")
+                    SettingsSidebarRow(pane: item, reading: model.reading, availableUpdate: "1.1",
+                                       selected: item == .balance, scheme: scheme)
                 }
             }
-            .padding(12)), CGSize(width: 210, height: 200)),
+            .padding(8)
+            .frame(width: 176, alignment: .top)
+            .background(Palette.raised(scheme))), CGSize(width: 176, height: 200)),
             ("probe", AnyView(probe), CGSize(width: 340, height: 340))
         ]
     }
